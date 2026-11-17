@@ -4,152 +4,356 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cờ Tướng Online - Xiangqi</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS cho kết nối Online P2P Cloud -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&display=swap');
-        
-        /* Bàn cờ tướng chuẩn 9 cột x 10 hàng */
-        .xiangqi-board {
-            width: 100%;
-            max-width: 420px;
-            aspect-ratio: 9 / 10;
-            background-color: #fce762;
-            background-image: 
-                /* Các đường kẻ dọc */
-                linear-gradient(to right, #854d0e 1.5px, transparent 1.5px),
-                /* Các đường kẻ ngang */
-                linear-gradient(to bottom, #854d0e 1.5px, transparent 1.5px);
-            background-size: 11.11% 10%;
-            background-position: center;
-            border: 4px solid #78350f;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-            position: relative;
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&display=swap');
+
+        body {
+            background: radial-gradient(circle at center, #3e1f0d 0%, #1c0d05 100%);
+            font-family: system-ui, -apple-system, sans-serif;
+            touch-action: manipulation;
         }
 
-        .piece {
-            transition: all 0.15s ease-in-out;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.6);
+        /* Khung bàn cờ gỗ có viền rộng rãi xung quanh */
+        .board-frame {
+            background: linear-gradient(135deg, #e6b873 0%, #d49a4a 50%, #c28334 100%);
+            border: 6px solid #5c2c0c;
+            border-radius: 12px;
+            box-shadow: 
+                0 15px 35px rgba(0, 0, 0, 0.65),
+                inset 0 2px 4px rgba(255, 255, 255, 0.45),
+                inset 0 -3px 6px rgba(92, 44, 12, 0.5);
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            aspect-ratio: 9 / 10;
+        }
+
+        /* Quân cờ gỗ 3D khắc chữ */
+        .xiangqi-piece {
+            position: absolute;
+            width: 9.6%;
+            aspect-ratio: 1 / 1;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease;
+            user-select: none;
+            font-family: 'Noto Serif TC', serif;
+            font-weight: 900;
+        }
+
+        .piece-wood-base {
+            background: radial-gradient(circle at 35% 30%, #fff7e6 0%, #f3d59b 65%, #d6a65c 100%);
+            box-shadow: 
+                0 4px 6px rgba(0, 0, 0, 0.45),
+                0 2px 0 #8c581c,
+                inset 0 1px 2px rgba(255, 255, 255, 0.9);
+        }
+
+        .piece-red {
+            color: #b91c1c;
+            border: 2px solid #b91c1c;
+        }
+        .piece-red::after {
+            content: '';
+            position: absolute;
+            inset: 2.5px;
+            border-radius: 50%;
+            border: 1px solid rgba(185, 28, 28, 0.55);
+            pointer-events: none;
+        }
+
+        .piece-black {
+            color: #171717;
+            border: 2px solid #262626;
+        }
+        .piece-black::after {
+            content: '';
+            position: absolute;
+            inset: 2.5px;
+            border-radius: 50%;
+            border: 1px solid rgba(23, 23, 23, 0.55);
+            pointer-events: none;
+        }
+
+        .piece-selected {
+            transform: translate(-50%, -56%) scale(1.14) !important;
+            box-shadow: 
+                0 10px 16px rgba(0, 0, 0, 0.55),
+                0 0 0 3px #10b981,
+                inset 0 1px 3px rgba(255, 255, 255, 1) !important;
+            z-index: 30 !important;
+        }
+
+        .last-move-ring {
+            box-shadow: 
+                0 4px 6px rgba(0, 0, 0, 0.45),
+                0 0 0 2.5px #2563eb !important;
+        }
+
+        /* Điểm gợi ý nước đi hợp lệ */
+        .valid-dot {
+            position: absolute;
+            width: 3.4%;
+            aspect-ratio: 1 / 1;
+            transform: translate(-50%, -50%);
+            background-color: rgba(16, 185, 129, 0.85);
+            border: 1.5px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        .valid-capture-ring {
+            position: absolute;
+            width: 10.6%;
+            aspect-ratio: 1 / 1;
+            transform: translate(-50%, -50%);
+            border: 2.5px dashed #ef4444;
+            border-radius: 50%;
+            animation: spinSlow 6s linear infinite;
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        @keyframes spinSlow {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-amber-950 text-amber-100 font-sans select-none min-h-screen flex flex-col items-center justify-between p-2">
+<body class="text-amber-100 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none">
 
     <!-- HEADER -->
-    <header class="w-full max-w-md flex justify-between items-center bg-amber-900/90 px-4 py-2 rounded-xl shadow border border-amber-700/50">
-        <h1 class="text-lg font-bold tracking-wider text-amber-300" style="font-family: 'Noto Serif TC', serif;">🇨🇳 CỜ TƯỚNG ONLINE</h1>
-        <div id="connection-status" class="flex items-center gap-2 bg-amber-950/80 px-3 py-1 rounded-full text-xs border border-amber-700">
-            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span id="status-text">Đang kết nối Cloud...</span>
+    <header class="w-full max-w-[440px] flex justify-between items-center bg-amber-950/90 px-3.5 py-2 rounded-xl border border-amber-800/70 shadow-lg">
+        <div class="flex items-center gap-2">
+            <span class="text-xl">🏮</span>
+            <h1 class="text-base sm:text-lg font-bold tracking-wide text-amber-300" style="font-family: 'Noto Serif TC', serif;">CỜ TƯỚNG ONLINE</h1>
+        </div>
+        <div class="flex items-center gap-2 bg-black/40 px-2.5 py-1 rounded-full text-[11px] border border-amber-800/60">
+            <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span id="status-text" class="text-amber-200 font-medium">Đang kết nối...</span>
         </div>
     </header>
 
-    <!-- MAIN CONTAINER -->
-    <main class="w-full max-w-md flex-1 flex flex-col items-center justify-center my-2">
+    <!-- MAIN -->
+    <main class="w-full max-w-[440px] flex-1 flex flex-col items-center justify-center my-2">
 
-        <!-- LOBBY SCREEN -->
-        <div id="lobby-screen" class="w-full bg-amber-900/95 p-5 rounded-2xl shadow-2xl border border-amber-700 space-y-4">
+        <!-- MÀN HÌNH SẢNH CHỜ -->
+        <div id="lobby-screen" class="w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
             <div class="text-center space-y-1">
-                <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Phòng Đấu Trực Tuyến</h2>
-                <p class="text-xs text-amber-300/80">Chơi trực tiếp giữa 2 điện thoại qua Internet</p>
+                <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Kỳ Đài Trực Tuyến</h2>
+                <p class="text-xs text-amber-400/80">Tạo phòng và chia sẻ mã 6 ký tự cho bạn bè cùng chơi</p>
             </div>
 
-            <div class="space-y-3 pt-2">
+            <div class="space-y-3 pt-1">
                 <div>
-                    <label class="block text-xs font-medium text-amber-300 mb-1">Tên hiển thị của bạn:</label>
-                    <input type="text" id="player-name" value="Kỳ Thủ" class="w-full bg-amber-950 border border-amber-700 rounded-lg px-3 py-2 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
+                    <label class="block text-xs font-medium text-amber-300 mb-1">Tên kỳ thủ của bạn:</label>
+                    <input type="text" id="player-name" value="Kỳ Thủ" maxlength="16" class="w-full bg-black/40 border border-amber-700 rounded-xl px-3.5 py-2.5 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
                 </div>
 
-                <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-                    <span>🏠 Tạo Phòng Mới</span>
+                <button onclick="createRoom()" class="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-[0.98] flex items-center justify-center gap-2">
+                    <span>🏠 Tạo Phòng Mới (Cầm Quân Đỏ)</span>
                 </button>
 
                 <div class="relative flex py-1 items-center">
-                    <div class="flex-grow border-t border-amber-700"></div>
-                    <span class="flex-shrink mx-4 text-xs text-amber-400 uppercase">Hoặc vào phòng</span>
-                    <div class="flex-grow border-t border-amber-700"></div>
+                    <div class="flex-grow border-t border-amber-800"></div>
+                    <span class="flex-shrink mx-3 text-[11px] text-amber-400 uppercase tracking-wider">Hoặc vào phòng bạn bè</span>
+                    <div class="flex-grow border-t border-amber-800"></div>
                 </div>
 
-                <div class="space-y-2">
-                    <input type="text" id="room-code-input" placeholder="Nhập mã phòng 6 ký tự..." class="w-full uppercase text-center tracking-widest bg-amber-950 border border-amber-700 rounded-lg px-3 py-2 text-sm font-bold text-amber-100 focus:outline-none focus:border-amber-400">
-                    <button onclick="joinRoom()" class="w-full bg-amber-700 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-                        <span>⚔️ Vào Phòng Đấu</span>
+                <div class="flex gap-2">
+                    <input type="text" id="room-code-input" maxlength="6" placeholder="MÃ PHÒNG" class="flex-1 uppercase text-center tracking-[0.2em] bg-black/40 border border-amber-700 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-amber-100 focus:outline-none focus:border-amber-400">
+                    <button onclick="joinRoom()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition active:scale-[0.98]">
+                        Vào Phòng
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- WAITING ROOM SCREEN -->
-        <div id="waiting-screen" class="hidden w-full bg-amber-900/95 p-6 rounded-2xl shadow-2xl border border-amber-700 text-center space-y-4">
-            <h2 class="text-lg font-bold text-amber-200">Đang chờ đối thủ vào phòng...</h2>
-            <p class="text-xs text-amber-300">Gửi mã phòng này cho bạn bè của bạn:</p>
-            <div class="bg-amber-950 border border-amber-600 py-3 rounded-xl shadow-inner">
-                <span id="display-room-code" class="text-3xl font-mono font-bold tracking-widest text-emerald-400">------</span>
+        <!-- MÀN HÌNH CHỜ ĐỐI THỦ -->
+        <div id="waiting-screen" class="hidden w-full bg-amber-950/90 p-6 rounded-2xl shadow-2xl border border-amber-800 text-center space-y-4">
+            <div class="inline-block p-3 rounded-full bg-amber-900/60 border border-amber-700 text-2xl animate-bounce">⏳</div>
+            <h2 class="text-lg font-bold text-amber-200">Đang chờ đối thủ vào bàn...</h2>
+            <p class="text-xs text-amber-300/80">Gửi mã phòng dưới đây cho người chơi thứ 2:</p>
+            <div class="bg-black/50 border border-amber-600/80 py-3.5 rounded-xl shadow-inner">
+                <span id="display-room-code" class="text-3xl font-mono font-black tracking-[0.25em] text-emerald-400">------</span>
             </div>
-            <button onclick="copyRoomCode()" class="text-xs bg-amber-800 hover:bg-amber-700 px-4 py-2 rounded-lg text-amber-200 transition shadow">📋 Sao chép mã phòng</button>
-            <div>
-                <button onclick="location.reload()" class="text-xs text-red-300 hover:underline mt-2">Hủy phòng</button>
+            <div class="flex justify-center gap-3 pt-1">
+                <button onclick="copyRoomCode()" class="text-xs bg-amber-700 hover:bg-amber-600 px-4 py-2.5 rounded-xl text-white font-semibold transition shadow">📋 Sao chép mã</button>
+                <button onclick="location.reload()" class="text-xs bg-red-950 hover:bg-red-900 border border-red-800 px-4 py-2.5 rounded-xl text-red-200 transition">Hủy phòng</button>
             </div>
         </div>
 
-        <!-- GAME SCREEN -->
-        <div id="game-screen" class="hidden w-full flex flex-col items-center space-y-2">
-            <!-- Opponent Info -->
-            <div class="w-full flex justify-between items-center bg-amber-900/90 px-3 py-1.5 rounded-lg text-xs border border-amber-700 shadow">
-                <span id="opponent-name" class="font-bold text-amber-200">Đối thủ: Đang kết nối...</span>
-                <span id="turn-indicator" class="px-2.5 py-0.5 rounded bg-amber-950 text-amber-300 font-semibold">Lượt đi</span>
+        <!-- MÀN HÌNH BÀN CỜ -->
+        <div id="game-screen" class="hidden w-full flex flex-col items-center gap-2">
+            
+            <!-- Thanh thông tin đối thủ (Phía trên) -->
+            <div class="w-full flex justify-between items-center bg-amber-950/90 px-3 py-2 rounded-xl text-xs border border-amber-800/80 shadow">
+                <div class="flex items-center gap-2">
+                    <span id="opp-badge" class="w-3 h-3 rounded-full bg-stone-900 border border-amber-400"></span>
+                    <span id="opponent-name" class="font-bold text-amber-200">Đối thủ</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="check-alert" class="hidden px-2 py-0.5 rounded bg-red-600 text-white font-bold animate-pulse">CHIẾU TƯỚNG!</span>
+                    <span id="turn-indicator" class="px-2.5 py-1 rounded-lg bg-amber-900 text-amber-200 font-bold">Đang chờ</span>
+                </div>
             </div>
 
-            <!-- Board Container -->
-            <div class="xiangqi-board" id="board-container">
-                <!-- River Text (Sông) -->
-                <div class="absolute inset-x-0 top-[40%] h-[10%] flex justify-around items-center text-amber-900/40 font-bold text-xl tracking-[1em] pointer-events-none select-none" style="font-family: 'Noto Serif TC', serif;">
-                    <span>楚河</span><span>漢界</span>
-                </div>
+            <!-- BÀN CỜ TƯỚNG CHUẨN TỌA ĐỘ + VIỀN RỘNG -->
+            <div class="board-frame" id="board-frame">
+                <!-- SVG vẽ đường kẻ bàn cờ có padding chuẩn:
+                     ViewBox 900 x 1000.
+                     Lề trái/phải = 70 (cách nhau 95 cho 8 khoảng -> 70 + 8*95 = 830, lề phải còn 70)
+                     Lề trên/dưới = 70 (cách nhau 95.55 cho 9 khoảng -> 70 + 9*95.55 = 930, lề dưới còn 70)
+                -->
+                <svg viewBox="0 0 900 1000" class="w-full h-full block pointer-events-none">
+                    <!-- Viền khung đôi trang trí ngoài lưới cờ -->
+                    <rect x="56" y="56" width="788" height="888" fill="none" stroke="#5c2c0c" stroke-width="5"/>
+                    <rect x="70" y="70" width="760" height="860" fill="none" stroke="#5c2c0c" stroke-width="2.5"/>
 
-                <!-- Palace Lines Red (Cung Tướng Đỏ) -->
-                <div class="absolute left-[33.33%] bottom-0 w-[33.33%] h-[20%] pointer-events-none border-t border-amber-800/40" style="background: linear-gradient(to top right, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%), linear-gradient(to top left, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%);"></div>
-                
-                <!-- Palace Lines Black (Cung Tướng Đen) -->
-                <div class="absolute left-[33.33%] top-0 w-[33.33%] h-[20%] pointer-events-none border-b border-amber-800/40" style="background: linear-gradient(to bottom right, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%), linear-gradient(to bottom left, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%);"></div>
-                
-                <!-- Pieces Layer -->
+                    <!-- 10 Đường ngang (y = 70 + r * 95.555) -->
+                    <g stroke="#5c2c0c" stroke-width="2.2">
+                        <line x1="70" y1="70" x2="830" y2="70"/>
+                        <line x1="70" y1="165.56" x2="830" y2="165.56"/>
+                        <line x1="70" y1="261.11" x2="830" y2="261.11"/>
+                        <line x1="70" y1="356.67" x2="830" y2="356.67"/>
+                        <line x1="70" y1="452.22" x2="830" y2="452.22"/>
+                        <line x1="70" y1="547.78" x2="830" y2="547.78"/>
+                        <line x1="70" y1="643.33" x2="830" y2="643.33"/>
+                        <line x1="70" y1="738.89" x2="830" y2="738.89"/>
+                        <line x1="70" y1="834.44" x2="830" y2="834.44"/>
+                        <line x1="70" y1="930" x2="830" y2="930"/>
+                    </g>
+
+                    <!-- 9 Đường dọc (x = 70 + c * 95) - Ngắt quãng ở sông giữa hàng 4 và hàng 5 -->
+                    <g stroke="#5c2c0c" stroke-width="2.2">
+                        <!-- Nửa trên (Hàng 0 đến Hàng 4) -->
+                        <line x1="165" y1="70" x2="165" y2="452.22"/>
+                        <line x1="260" y1="70" x2="260" y2="452.22"/>
+                        <line x1="355" y1="70" x2="355" y2="452.22"/>
+                        <line x1="450" y1="70" x2="450" y2="452.22"/>
+                        <line x1="545" y1="70" x2="545" y2="452.22"/>
+                        <line x1="640" y1="70" x2="640" y2="452.22"/>
+                        <line x1="735" y1="70" x2="735" y2="452.22"/>
+
+                        <!-- Nửa dưới (Hàng 5 đến Hàng 9) -->
+                        <line x1="165" y1="547.78" x2="165" y2="930"/>
+                        <line x1="260" y1="547.78" x2="260" y2="930"/>
+                        <line x1="355" y1="547.78" x2="355" y2="930"/>
+                        <line x1="450" y1="547.78" x2="450" y2="930"/>
+                        <line x1="545" y1="547.78" x2="545" y2="930"/>
+                        <line x1="640" y1="547.78" x2="640" y2="930"/>
+                        <line x1="735" y1="547.78" x2="735" y2="930"/>
+                    </g>
+
+                    <!-- Đường chéo Cung Tướng Trên (cột 3-5, hàng 0-2) -->
+                    <g stroke="#5c2c0c" stroke-width="2.2">
+                        <line x1="355" y1="70" x2="545" y2="261.11"/>
+                        <line x1="545" y1="70" x2="355" y2="261.11"/>
+                    </g>
+
+                    <!-- Đường chéo Cung Tướng Dưới (cột 3-5, hàng 7-9) -->
+                    <g stroke="#5c2c0c" stroke-width="2.2">
+                        <line x1="355" y1="738.89" x2="545" y2="930"/>
+                        <line x1="545" y1="738.89" x2="355" y2="930"/>
+                    </g>
+
+                    <!-- Chữ Sở Hà - Hán Giới ở giữa sông -->
+                    <text x="260" y="514" fill="#5c2c0c" fill-opacity="0.7" font-size="42" font-family="'Noto Serif TC', serif" font-weight="bold" text-anchor="middle" letter-spacing="14">楚河</text>
+                    <text x="640" y="514" fill="#5c2c0c" fill-opacity="0.7" font-size="42" font-family="'Noto Serif TC', serif" font-weight="bold" text-anchor="middle" letter-spacing="14">漢界</text>
+
+                    <!-- Các dấu hoa thị (+) đánh dấu vị trí Pháo và Tốt -->
+                    <g id="board-markers" stroke="#5c2c0c" stroke-width="2.2" fill="none"></g>
+                </svg>
+
+                <!-- Lớp chứa quân cờ & vùng bấm -->
                 <div id="pieces-layer" class="absolute inset-0"></div>
             </div>
 
-            <!-- Player Info & Controls -->
-            <div class="w-full flex justify-between items-center bg-amber-900/90 px-3 py-1.5 rounded-lg text-xs border border-amber-700 shadow">
-                <span id="my-name" class="font-bold text-amber-200">Bạn: Kỳ Thủ</span>
+            <!-- Thanh thông tin bản thân & nút chức năng (Phía dưới) -->
+            <div class="w-full flex justify-between items-center bg-amber-950/90 px-3 py-2 rounded-xl text-xs border border-amber-800/80 shadow">
+                <div class="flex items-center gap-2">
+                    <span id="my-badge" class="w-3 h-3 rounded-full bg-red-600 border border-amber-300"></span>
+                    <span id="my-name" class="font-bold text-amber-200">Bạn</span>
+                </div>
                 <div class="flex gap-2">
-                    <button onclick="surrender()" class="bg-red-900/80 hover:bg-red-800 text-red-200 px-3 py-1 rounded transition shadow">Đầu hàng</button>
+                    <button onclick="requestDraw()" class="bg-amber-800 hover:bg-amber-700 text-amber-100 px-3 py-1 rounded-lg transition">Xin hòa</button>
+                    <button onclick="surrender()" class="bg-red-900/90 hover:bg-red-800 text-red-100 px-3 py-1 rounded-lg transition">Đầu hàng</button>
                 </div>
             </div>
         </div>
-
     </main>
 
-    <!-- FOOTER LOG -->
-    <footer class="w-full max-w-md text-center text-[10px] text-amber-400/60 py-1">
-        Cờ Tướng Online P2P Cloud (v2.1)
-    </footer>
+    <!-- MODAL KẾT THÚC VÁN -->
+    <div id="end-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-amber-950 border-2 border-amber-600 rounded-2xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl">
+            <div id="end-icon" class="text-4xl">🏆</div>
+            <h3 id="end-title" class="text-xl font-bold text-amber-200">Chiến Thắng!</h3>
+            <p id="end-desc" class="text-xs text-amber-300/90">Ván đấu đã kết thúc.</p>
+            <div class="flex gap-2 pt-2">
+                <button onclick="resetMatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs">Chơi ván mới</button>
+                <button onclick="location.reload()" class="flex-1 bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-2.5 rounded-xl text-xs">Thoát phòng</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- SCRIPT LOGIC -->
     <script>
+        // Vẽ tự động các dấu hoa thị (+) tại vị trí Pháo và Tốt trên SVG
+        (function drawMarkers() {
+            const markersGroup = document.getElementById('board-markers');
+            const positions = [
+                // Vị trí Pháo
+                {r: 2, c: 1}, {r: 2, c: 7},
+                {r: 7, c: 1}, {r: 7, c: 7},
+                // Vị trí Tốt
+                {r: 3, c: 0}, {r: 3, c: 2}, {r: 3, c: 4}, {r: 3, c: 6}, {r: 3, c: 8},
+                {r: 6, c: 0}, {r: 6, c: 2}, {r: 6, c: 4}, {r: 6, c: 6}, {r: 6, c: 8}
+            ];
+
+            positions.forEach(pos => {
+                const cx = 70 + pos.c * 95;
+                const cy = 70 + pos.r * 95.555;
+                const g = 6;  // khoảng cách từ tâm
+                const l = 14; // chiều dài nét góc
+
+                let d = '';
+                if (pos.c > 0) {
+                    // Góc trên trái & dưới trái
+                    d += `M ${cx - g - l} ${cy - g} L ${cx - g} ${cy - g} L ${cx - g} ${cy - g - l} `;
+                    d += `M ${cx - g - l} ${cy + g} L ${cx - g} ${cy + g} L ${cx - g} ${cy + g + l} `;
+                }
+                if (pos.c < 8) {
+                    // Góc trên phải & dưới phải
+                    d += `M ${cx + g + l} ${cy - g} L ${cx + g} ${cy - g} L ${cx + g} ${cy - g - l} `;
+                    d += `M ${cx + g + l} ${cy + g} L ${cx + g} ${cy + g} L ${cx + g} ${cy + g + l} `;
+                }
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', d);
+                markersGroup.appendChild(path);
+            });
+        })();
+
+        // Biến trạng thái mạng & trò chơi
         let peer = null;
         let conn = null;
-        let myId = '';
         let roomCode = '';
-        let isHost = false;
-        let myColor = 'red'; // 'red' or 'black'
+        let myColor = 'red';
         let currentTurn = 'red';
         let selectedPiece = null;
+        let validMoves = [];
+        let lastMove = null;
         let myName = 'Kỳ Thủ';
         let opponentName = 'Đối thủ';
+        let gameOver = false;
 
-        // Initial standard board setup (10 rows x 9 cols)
-        let boardState = [
+        const INITIAL_BOARD = [
             ['B_ROOK', 'B_HORSE', 'B_ELEPHANT', 'B_ADVISOR', 'B_GENERAL', 'B_ADVISOR', 'B_ELEPHANT', 'B_HORSE', 'B_ROOK'],
             [null, null, null, null, null, null, null, null, null],
             [null, 'B_CANNON', null, null, null, null, null, 'B_CANNON', null],
@@ -162,29 +366,41 @@
             ['R_ROOK', 'R_HORSE', 'R_ELEPHANT', 'R_ADVISOR', 'R_GENERAL', 'R_ADVISOR', 'R_ELEPHANT', 'R_HORSE', 'R_ROOK']
         ];
 
-        const pieceChinese = {
+        let boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
+
+        const pieceChars = {
             'R_GENERAL': '帥', 'R_ADVISOR': '仕', 'R_ELEPHANT': '相', 'R_HORSE': '馬', 'R_ROOK': '車', 'R_CANNON': '炮', 'R_PAWN': '兵',
             'B_GENERAL': '將', 'B_ADVISOR': '士', 'B_ELEPHANT': '象', 'B_HORSE': '馬', 'B_ROOK': '車', 'B_CANNON': '砲', 'B_PAWN': '卒'
         };
 
-        // Initialize PeerJS Cloud
-        function initPeer() {
-            peer = new Peer({
+        // Khởi tạo PeerJS Cloud
+        function initPeer(customId = null) {
+            if (peer) peer.destroy();
+            const config = {
                 config: {
-                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
                 }
-            });
+            };
+            peer = customId ? new Peer(customId, config) : new Peer(config);
 
-            peer.on('open', (id) => {
-                myId = id;
-                document.getElementById('status-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
-                document.getElementById('status-text').innerText = 'Sẵn sàng kết nối Online (Cloud)';
+            peer.on('open', () => {
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+                document.getElementById('status-text').innerText = 'Online (Cloud)';
             });
 
             peer.on('error', (err) => {
                 console.error(err);
-                document.getElementById('status-dot').className = 'w-2.5 h-2.5 rounded-full bg-red-500';
-                document.getElementById('status-text').innerText = 'Lỗi kết nối Cloud';
+                if (err.type === 'unavailable-id') {
+                    alert('Mã phòng bị trùng, vui lòng bấm Tạo Phòng lại!');
+                } else if (err.type === 'peer-unavailable') {
+                    alert('Không tìm thấy mã phòng này! Hãy kiểm tra lại 6 ký tự.');
+                } else {
+                    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+                    document.getElementById('status-text').innerText = 'Mất kết nối mạng';
+                }
             });
 
             peer.on('connection', (connection) => {
@@ -195,50 +411,30 @@
 
         initPeer();
 
-        function generateRoomCode() {
-            return Math.random().toString(36).substring(2, 8).toUpperCase();
-        }
-
         function createRoom() {
-            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ';
-            roomCode = generateRoomCode();
-            isHost = true;
+            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ Đỏ';
+            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
             myColor = 'red';
 
-            if (peer) peer.destroy();
-            
-            peer = new Peer('xiangqi_' + roomCode, {
-                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-            });
-
+            initPeer('xiangqi_' + roomCode);
             peer.on('open', () => {
                 document.getElementById('lobby-screen').classList.add('hidden');
                 document.getElementById('waiting-screen').classList.remove('hidden');
                 document.getElementById('display-room-code').innerText = roomCode;
             });
-
-            peer.on('connection', (connection) => {
-                conn = connection;
-                setupConnection();
-            });
-
-            peer.on('error', () => {
-                alert('Mã phòng đã tồn tại hoặc lỗi kết nối. Vui lòng thử lại!');
-            });
         }
 
         function joinRoom() {
-            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ';
-            let inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ Đen';
+            const inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
             if (inputCode.length !== 6) {
-                alert('Vui lòng nhập đúng mã phòng gồm 6 ký tự!');
+                alert('Vui lòng nhập chính xác mã phòng gồm 6 ký tự!');
                 return;
             }
             roomCode = inputCode;
-            isHost = false;
             myColor = 'black';
 
-            conn = peer.connect('xiangqi_' + roomCode);
+            conn = peer.connect('xiangqi_' + roomCode, { reliable: true });
             setupConnection();
         }
 
@@ -248,37 +444,75 @@
             });
 
             conn.on('data', (data) => {
-                handleNetworkData(data);
+                if (data.type === 'JOIN') {
+                    opponentName = data.name;
+                    conn.send({ type: 'WELCOME', name: myName });
+                    startGame();
+                } else if (data.type === 'WELCOME') {
+                    opponentName = data.name;
+                    startGame();
+                } else if (data.type === 'MOVE') {
+                    boardState = data.boardState;
+                    currentTurn = data.currentTurn;
+                    lastMove = data.lastMove;
+                    selectedPiece = null;
+                    validMoves = [];
+                    renderBoard();
+                    evaluateTurnState();
+                } else if (data.type === 'SURRENDER') {
+                    showEndModal('🏆', 'Chiến Thắng!', 'Đối thủ đã xin đầu hàng.');
+                } else if (data.type === 'DRAW_REQ') {
+                    if (confirm('Đối thủ muốn xin hòa ván cờ này. Bạn có đồng ý không?')) {
+                        conn.send({ type: 'DRAW_ACCEPT' });
+                        showEndModal('🤝', 'Hòa Cờ!', 'Hai kỳ thủ đã đồng ý hòa.');
+                    }
+                } else if (data.type === 'DRAW_ACCEPT') {
+                    showEndModal('🤝', 'Hòa Cờ!', 'Đối thủ đã chấp nhận lời đề nghị hòa.');
+                } else if (data.type === 'RESET') {
+                    resetBoardLocal();
+                }
             });
-        }
 
-        function handleNetworkData(data) {
-            if (data.type === 'JOIN') {
-                opponentName = data.name;
-                conn.send({ type: 'WELCOME', name: myName });
-                startGame();
-            } else if (data.type === 'WELCOME') {
-                opponentName = data.name;
-                startGame();
-            } else if (data.type === 'MOVE') {
-                boardState = data.boardState;
-                currentTurn = data.currentTurn;
-                renderBoard();
-                checkGameStatus();
-            } else if (data.type === 'SURRENDER') {
-                alert('Đối thủ đã đầu hàng! Bạn đã chiến thắng.');
-                location.reload();
-            }
+            conn.on('close', () => {
+                if (!gameOver) {
+                    alert('Đối thủ đã ngắt kết nối khỏi phòng!');
+                }
+            });
         }
 
         function startGame() {
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('waiting-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            
-            document.getElementById('my-name').innerText = `Bạn (${myColor === 'red' ? 'Đỏ' : 'Đen'}): ${myName}`;
-            document.getElementById('opponent-name').innerText = `Đối thủ: ${opponentName}`;
+
+            document.getElementById('my-name').innerText = `${myName} (${myColor === 'red' ? 'Đỏ' : 'Đen'})`;
+            document.getElementById('opponent-name').innerText = `${opponentName} (${myColor === 'red' ? 'Đen' : 'Đỏ'})`;
+
+            document.getElementById('my-badge').className = myColor === 'red'
+                ? 'w-3 h-3 rounded-full bg-red-600 border border-amber-300'
+                : 'w-3 h-3 rounded-full bg-stone-900 border border-amber-300';
+            document.getElementById('opp-badge').className = myColor === 'red'
+                ? 'w-3 h-3 rounded-full bg-stone-900 border border-amber-300'
+                : 'w-3 h-3 rounded-full bg-red-600 border border-amber-300';
+
+            resetBoardLocal();
+        }
+
+        function resetBoardLocal() {
+            boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
+            currentTurn = 'red';
+            selectedPiece = null;
+            validMoves = [];
+            lastMove = null;
+            gameOver = false;
+            document.getElementById('end-modal').classList.add('hidden');
+            document.getElementById('check-alert').classList.add('hidden');
             renderBoard();
+        }
+
+        function resetMatch() {
+            if (conn && conn.open) conn.send({ type: 'RESET' });
+            resetBoardLocal();
         }
 
         function copyRoomCode() {
@@ -286,130 +520,343 @@
             alert('Đã sao chép mã phòng: ' + roomCode);
         }
 
+        // Quy đổi tọa độ hàng/cột sang phần trăm khớp 100% với SVG (lề 70/900 = 7.7778%, bước cột 95/900 = 10.5556%; lề trên 70/1000 = 7%, bước hàng 95.555/1000 = 9.5556%)
+        function getCoordPercent(r, c) {
+            const isFlipped = (myColor === 'black');
+            const renderR = isFlipped ? 9 - r : r;
+            const renderC = isFlipped ? 8 - c : c;
+            return {
+                left: 7.7778 + renderC * 10.5556,
+                top: 7.0 + renderR * 9.5556
+            };
+        }
+
         function renderBoard() {
             const layer = document.getElementById('pieces-layer');
             layer.innerHTML = '';
 
-            let isFlipped = (myColor === 'black');
-
+            // Vẽ tất cả 90 giao điểm tương tác & quân cờ
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 9; c++) {
-                    let piece = boardState[r][c];
-                    let renderR = isFlipped ? 9 - r : r;
-                    let renderC = isFlipped ? 8 - c : c;
-
-                    // Tọa độ phần trăm chuẩn khớp tâm các đường giao nhau trên bàn cờ
-                    let leftPos = renderC * 11.11 + 5.55;
-                    let topPos = renderR * 10 + 5;
+                    const pos = getCoordPercent(r, c);
+                    const piece = boardState[r][c];
+                    const isValidTarget = validMoves.some(m => m.r === r && m.c === c);
 
                     if (piece) {
-                        let div = document.createElement('div');
-                        let isRed = piece.startsWith('R');
-                        div.className = `absolute w-[9%] aspect-square rounded-full flex items-center justify-center font-bold text-base md:text-lg cursor-pointer piece -translate-x-1/2 -translate-y-1/2 ${
-                            isRed 
-                                ? 'bg-amber-100 text-red-700 border-2 border-red-600' 
-                                : 'bg-stone-900 text-amber-100 border-2 border-stone-600'
-                        } ${selectedPiece && selectedPiece.r === r && selectedPiece.c === c ? 'ring-4 ring-amber-400 scale-110 z-20' : 'z-10'}`;
-                        
-                        div.style.left = `${leftPos}%`;
-                        div.style.top = `${topPos}%`;
-                        div.style.fontFamily = "'Noto Serif TC', serif";
-                        div.innerText = pieceChinese[piece];
+                        const isRed = piece.startsWith('R');
+                        const isSelected = selectedPiece && selectedPiece.r === r && selectedPiece.c === c;
+                        const isLastMove = lastMove && ((lastMove.toR === r && lastMove.toC === c) || (lastMove.fromR === r && lastMove.fromC === c));
+
+                        const div = document.createElement('div');
+                        div.className = `xiangqi-piece piece-wood-base ${isRed ? 'piece-red' : 'piece-black'} ${isSelected ? 'piece-selected' : ''} ${isLastMove ? 'last-move-ring' : ''}`;
+                        div.style.left = `${pos.left}%`;
+                        div.style.top = `${pos.top}%`;
+                        div.style.fontSize = 'clamp(16px, 4.6vw, 22px)';
+                        div.style.zIndex = isSelected ? '30' : '15';
+                        div.innerText = pieceChars[piece];
 
                         div.onclick = (e) => {
                             e.stopPropagation();
                             handleCellClick(r, c);
                         };
-
                         layer.appendChild(div);
+
+                        // Vòng tròn đỏ nhấp nháy nếu quân đối phương nằm trong tầm ăn
+                        if (isValidTarget) {
+                            const ring = document.createElement('div');
+                            ring.className = 'valid-capture-ring';
+                            ring.style.left = `${pos.left}%`;
+                            ring.style.top = `${pos.top}%`;
+                            layer.appendChild(ring);
+                        }
                     } else {
-                        // Vùng bấm ô trống để đi quân
-                        let div = document.createElement('div');
-                        div.className = 'absolute w-[9%] aspect-square cursor-pointer -translate-x-1/2 -translate-y-1/2 z-0';
-                        div.style.left = `${leftPos}%`;
-                        div.style.top = `${topPos}%`;
-
-                        div.onclick = (e) => {
+                        // Vùng chạm giao điểm trống
+                        const hitArea = document.createElement('div');
+                        hitArea.className = 'absolute w-[9.5%] aspect-square -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10';
+                        hitArea.style.left = `${pos.left}%`;
+                        hitArea.style.top = `${pos.top}%`;
+                        hitArea.onclick = (e) => {
                             e.stopPropagation();
                             handleCellClick(r, c);
                         };
-                        layer.appendChild(div);
+                        layer.appendChild(hitArea);
+
+                        // Chấm xanh gợi ý nước đi hợp lệ
+                        if (isValidTarget) {
+                            const dot = document.createElement('div');
+                            dot.className = 'valid-dot';
+                            dot.style.left = `${pos.left}%`;
+                            dot.style.top = `${pos.top}%`;
+                            layer.appendChild(dot);
+                        }
                     }
                 }
             }
 
-            // Update turn indicator
-            let turnText = document.getElementById('turn-indicator');
+            // Cập nhật thanh hiển thị lượt đi
+            const turnEl = document.getElementById('turn-indicator');
             if (currentTurn === myColor) {
-                turnText.innerText = 'Lượt của bạn';
-                turnText.className = 'px-2.5 py-0.5 rounded bg-emerald-700 text-white font-semibold shadow';
+                turnEl.innerText = 'Lượt của bạn';
+                turnEl.className = 'px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold shadow';
             } else {
-                turnText.innerText = 'Lượt đối thủ';
-                turnText.className = 'px-2.5 py-0.5 rounded bg-amber-950 text-amber-300 font-semibold';
+                turnEl.innerText = 'Lượt đối thủ';
+                turnEl.className = 'px-2.5 py-1 rounded-lg bg-amber-900/90 text-amber-300 font-semibold';
             }
         }
 
         function handleCellClick(r, c) {
-            if (currentTurn !== myColor) return;
+            if (gameOver || currentTurn !== myColor) return;
 
-            let piece = boardState[r][c];
+            const clickedPiece = boardState[r][c];
+            const myPrefix = myColor === 'red' ? 'R_' : 'B_';
 
-            if (piece && piece.startsWith(myColor === 'red' ? 'R' : 'B')) {
-                selectedPiece = { r, c, piece };
+            // Chọn quân của mình
+            if (clickedPiece && clickedPiece.startsWith(myPrefix)) {
+                selectedPiece = { r, c, piece: clickedPiece };
+                validMoves = getLegalMoves(boardState, r, c);
                 renderBoard();
                 return;
             }
 
+            // Di chuyển đến ô hợp lệ
             if (selectedPiece) {
-                let fromR = selectedPiece.r;
-                let fromC = selectedPiece.c;
+                const isLegal = validMoves.some(m => m.r === r && m.c === c);
+                if (!isLegal) return;
 
-                // Di chuyển quân cờ
+                const fromR = selectedPiece.r;
+                const fromC = selectedPiece.c;
+
                 boardState[r][c] = selectedPiece.piece;
                 boardState[fromR][fromC] = null;
 
+                lastMove = { fromR, fromC, toR: r, toC: c };
                 selectedPiece = null;
+                validMoves = [];
                 currentTurn = currentTurn === 'red' ? 'black' : 'red';
 
                 renderBoard();
-                checkGameStatus();
+                evaluateTurnState();
 
-                // Gửi dữ liệu qua mạng P2P Cloud
                 if (conn && conn.open) {
                     conn.send({
                         type: 'MOVE',
                         boardState: boardState,
-                        currentTurn: currentTurn
+                        currentTurn: currentTurn,
+                        lastMove: lastMove
                     });
                 }
             }
         }
 
-        function checkGameStatus() {
-            let hasRedGeneral = false;
-            let hasBlackGeneral = false;
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (boardState[r][c] === 'R_GENERAL') hasRedGeneral = true;
-                    if (boardState[r][c] === 'B_GENERAL') hasBlackGeneral = true;
+        // --- LUẬT CỜ TƯỚNG CHUẨN ---
+        function getPseudoMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const isRed = piece.startsWith('R_');
+            const type = piece.split('_')[1];
+            const moves = [];
+
+            const isEnemyOrEmpty = (tr, tc) => {
+                if (tr < 0 || tr > 9 || tc < 0 || tc > 8) return false;
+                const target = board[tr][tc];
+                if (!target) return true;
+                return isRed ? target.startsWith('B_') : target.startsWith('R_');
+            };
+
+            if (type === 'ROOK') {
+                const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                dirs.forEach(([dr, dc]) => {
+                    let nr = r + dr, nc = c + dc;
+                    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+                        if (!board[nr][nc]) {
+                            moves.push({r: nr, c: nc});
+                        } else {
+                            if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                            break;
+                        }
+                        nr += dr; nc += dc;
+                    }
+                });
+            } else if (type === 'CANNON') {
+                const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                dirs.forEach(([dr, dc]) => {
+                    let nr = r + dr, nc = c + dc;
+                    let jumped = false;
+                    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+                        if (!jumped) {
+                            if (!board[nr][nc]) {
+                                moves.push({r: nr, c: nc});
+                            } else {
+                                jumped = true; // Gặp ngòi
+                            }
+                        } else {
+                            if (board[nr][nc]) {
+                                if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                                break;
+                            }
+                        }
+                        nr += dr; nc += dc;
+                    }
+                });
+            } else if (type === 'HORSE') {
+                const jumps = [
+                    {dr: -2, dc: -1, lr: -1, lc: 0}, {dr: -2, dc: 1, lr: -1, lc: 0},
+                    {dr: 2, dc: -1, lr: 1, lc: 0},   {dr: 2, dc: 1, lr: 1, lc: 0},
+                    {dr: -1, dc: -2, lr: 0, lc: -1}, {dr: 1, dc: -2, lr: 0, lc: -1},
+                    {dr: -1, dc: 2, lr: 0, lc: 1},   {dr: 1, dc: 2, lr: 0, lc: 1}
+                ];
+                jumps.forEach(j => {
+                    const legR = r + j.lr, legC = c + j.lc;
+                    const nr = r + j.dr, nc = c + j.dc;
+                    if (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8 && !board[legR][legC]) {
+                        if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                    }
+                });
+            } else if (type === 'ELEPHANT') {
+                const steps = [
+                    {dr: -2, dc: -2, er: -1, ec: -1}, {dr: -2, dc: 2, er: -1, ec: 1},
+                    {dr: 2, dc: -2, er: 1, ec: -1},   {dr: 2, dc: 2, er: 1, ec: 1}
+                ];
+                steps.forEach(s => {
+                    const nr = r + s.dr, nc = c + s.dc;
+                    const eyeR = r + s.er, eyeC = c + s.ec;
+                    const inOwnSide = isRed ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4);
+                    if (inOwnSide && nc >= 0 && nc <= 8 && !board[eyeR][eyeC]) {
+                        if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                    }
+                });
+            } else if (type === 'ADVISOR') {
+                const steps = [[-1,-1],[-1,1],[1,-1],[1,1]];
+                steps.forEach(([dr, dc]) => {
+                    const nr = r + dr, nc = c + dc;
+                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
+                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                });
+            } else if (type === 'GENERAL') {
+                const steps = [[-1,0],[1,0],[0,-1],[0,1]];
+                steps.forEach(([dr, dc]) => {
+                    const nr = r + dr, nc = c + dc;
+                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
+                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                });
+            } else if (type === 'PAWN') {
+                const forward = isRed ? -1 : 1;
+                if (isEnemyOrEmpty(r + forward, c)) moves.push({r: r + forward, c});
+                const crossedRiver = isRed ? (r <= 4) : (r >= 5);
+                if (crossedRiver) {
+                    if (isEnemyOrEmpty(r, c - 1)) moves.push({r, c: c - 1});
+                    if (isEnemyOrEmpty(r, c + 1)) moves.push({r, c: c + 1});
                 }
             }
-            if (!hasRedGeneral) {
-                alert('Quân Đỏ đã mất Tướng! Quân Đen thắng.');
-                location.reload();
-            } else if (!hasBlackGeneral) {
-                alert('Quân Đen đã mất Tướng! Quân Đỏ thắng.');
-                location.reload();
+            return moves;
+        }
+
+        // Kiểm tra Tướng có đang bị chiếu hoặc lộ mặt Tướng không
+        function isKingInCheck(board, color) {
+            const kingName = color === 'red' ? 'R_GENERAL' : 'B_GENERAL';
+            const oppKingName = color === 'red' ? 'B_GENERAL' : 'R_GENERAL';
+            let kr = -1, kc = -1, okr = -1, okc = -1;
+
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] === kingName) { kr = r; kc = c; }
+                    if (board[r][c] === oppKingName) { okr = r; okc = c; }
+                }
+            }
+            if (kr === -1) return true;
+
+            // Kiểm tra luật Lộ mặt Tướng
+            if (kc === okc && okr !== -1) {
+                let blocked = false;
+                const minR = Math.min(kr, okr), maxR = Math.max(kr, okr);
+                for (let i = minR + 1; i < maxR; i++) {
+                    if (board[i][kc]) { blocked = true; break; }
+                }
+                if (!blocked) return true;
+            }
+
+            // Kiểm tra quân đối phương có ăn được Tướng không
+            const oppPrefix = color === 'red' ? 'B_' : 'R_';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] && board[r][c].startsWith(oppPrefix)) {
+                        const oppMoves = getPseudoMoves(board, r, c);
+                        if (oppMoves.some(m => m.r === kr && m.c === kc)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Lọc ra các nước đi hợp lệ (không để Tướng bị chiếu sau khi đi)
+        function getLegalMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const color = piece.startsWith('R_') ? 'red' : 'black';
+            const pseudo = getPseudoMoves(board, r, c);
+
+            return pseudo.filter(m => {
+                const copy = board.map(row => [...row]);
+                copy[m.r][m.c] = copy[r][c];
+                copy[r][c] = null;
+                return !isKingInCheck(copy, color);
+            });
+        }
+
+        // Đánh giá trạng thái Chiếu Tướng / Chiếu Bí sau mỗi nước đi
+        function evaluateTurnState() {
+            const inCheck = isKingInCheck(boardState, currentTurn);
+            const alertEl = document.getElementById('check-alert');
+            if (inCheck) {
+                alertEl.classList.remove('hidden');
+            } else {
+                alertEl.classList.add('hidden');
+            }
+
+            // Kiểm tra bên tới lượt còn nước đi hợp lệ nào không
+            const prefix = currentTurn === 'red' ? 'R_' : 'B_';
+            let hasAnyMove = false;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (boardState[r][c] && boardState[r][c].startsWith(prefix)) {
+                        if (getLegalMoves(boardState, r, c).length > 0) {
+                            hasAnyMove = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasAnyMove) break;
+            }
+
+            if (!hasAnyMove) {
+                const winner = currentTurn === 'red' ? 'black' : 'red';
+                if (winner === myColor) {
+                    showEndModal('🏆', 'Chiếu Bí - Bạn Thắng!', 'Đối thủ đã hết nước đi hợp lệ.');
+                } else {
+                    showEndModal('🏳️', 'Thua Cuộc!', 'Bạn đã bị chiếu bí hoặc hết nước đi.');
+                }
             }
         }
 
+        function showEndModal(icon, title, desc) {
+            gameOver = true;
+            document.getElementById('end-icon').innerText = icon;
+            document.getElementById('end-title').innerText = title;
+            document.getElementById('end-desc').innerText = desc;
+            document.getElementById('end-modal').classList.remove('hidden');
+        }
+
         function surrender() {
-            if (confirm('Bạn có chắc chắn muốn đầu hàng?')) {
-                if (conn && conn.open) {
-                    conn.send({ type: 'SURRENDER' });
-                }
-                alert('Bạn đã đầu hàng.');
-                location.reload();
+            if (confirm('Bạn có chắc chắn muốn đầu hàng ván này?')) {
+                if (conn && conn.open) conn.send({ type: 'SURRENDER' });
+                showEndModal('🏳️', 'Đã Đầu Hàng', 'Bạn đã xin nhận thua ván này.');
+            }
+        }
+
+        function requestDraw() {
+            if (conn && conn.open) {
+                conn.send({ type: 'DRAW_REQ' });
+                alert('Đã gửi lời đề nghị hòa tới đối thủ.');
             }
         }
     </script>
