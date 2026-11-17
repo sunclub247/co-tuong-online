@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cờ Tướng Online - Xiangqi Multiplayer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Tùy chỉnh giao diện bàn cờ gỗ và quân cờ truyền thống */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1c1917; /* Stone 900 */
+            color: #f5f5f4;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .wood-board {
+            background: linear-gradient(135deg, #e5b877 0%, #d49b54 50%, #c4873f 100%);
+            box-shadow: 
+                inset 0 0 25px rgba(101, 56, 15, 0.45),
+                0 12px 30px rgba(0, 0, 0, 0.65),
+                0 0 0 4px #78350f,
+                0 0 0 7px #451a03;
+        }
+
+        /* Hiệu ứng quân cờ tròn nổi khối 3D */
+        .xiangqi-piece {
+            font-family: 'Noto Serif', serif;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+            cursor: pointer;
+            background: radial-gradient(circle at 32% 28%, #fffbeb 0%, #fef3c7 55%, #e7d1a7 100%);
+            box-shadow: 
+                0 4px 6px rgba(0, 0, 0, 0.45),
+                0 2px 3px rgba(0, 0, 0, 0.3),
+                inset 0 -3px 4px rgba(146, 64, 14, 0.35),
+                inset 0 2px 3px rgba(255, 255, 255, 0.9);
+        }
+
+        .xiangqi-piece::after {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            border-radius: 50%;
+            border: 1.5px solid currentColor;
+            opacity: 0.65;
+            pointer-events: none;
+        }
+
+        .piece-red {
+            color: #dc2626;
+            border: 1.5px solid #b91c1c;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .piece-black {
+            color: #171717;
+            border: 1.5px solid #262626;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .piece-selected {
+            transform: scale(1.14) translateY(-3px);
+            box-shadow: 
+                0 10px 18px rgba(0, 0, 0, 0.55),
+                0 0 0 3px #facc15,
+                inset 0 2px 4px rgba(255, 255, 255, 1);
+            z-index: 30;
+        }
+
+        .piece-last-move {
+            box-shadow: 
+                0 4px 6px rgba(0, 0, 0, 0.45),
+                0 0 0 2.5px #38bdf8;
+        }
+
+        .piece-in-check {
+            animation: pulse-danger 1s infinite alternate;
+        }
+
+        @keyframes pulse-danger {
+            from { box-shadow: 0 0 0 3px #ef4444, 0 0 12px #ef4444; }
+            to { box-shadow: 0 0 0 6px #dc2626, 0 0 22px #dc2626; }
+        }
+
+        /* Điểm gợi ý nước đi hợp lệ */
+        .valid-dot {
+            width: 34%;
+            height: 34%;
+            border-radius: 50%;
+            background-color: rgba(22, 163, 74, 0.85);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
+            pointer-events: none;
+            animation: pop-in 0.15s ease-out;
+        }
+
+        /* Vòng tròn báo hiệu có thể ăn quân đối phương */
+        .capture-ring {
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 3px dashed #ef4444;
+            animation: spin-slow 8s linear infinite;
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pop-in {
+            from { transform: scale(0.3); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Tùy chỉnh thanh cuộn nhỏ gọn cho lịch sử nước đi */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 4px;
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between bg-stone-900 text-stone-100 overflow-x-hidden">
+
+    <!-- HEADER & TRẠNG THÁI KẾT NỐI -->
+    <header class="w-full max-w-md px-3 pt-2.5 pb-1.5 flex items-center justify-between border-b border-stone-800 bg-stone-900/95 sticky top-0 z-40">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center font-serif font-black text-lg text-amber-50 shadow">
+                帥
+            </div>
+            <div>
+                <h1 class="text-sm font-bold tracking-tight text-amber-400 leading-none">CỜ TƯỚNG ONLINE</h1>
+                <div class="flex items-center gap-1.5 mt-1">
+                    <span id="conn-dot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span id="conn-text" class="text-[11px] text-stone-400">Đang kết nối máy chủ...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hiển thị Mã Phòng khi đang trong trận -->
+        <div id="header-room-badge" class="hidden items-center gap-1.5 bg-stone-800 border border-stone-700 px-2.5 py-1 rounded-xl">
+            <div class="text-right">
+                <div class="text-[9px] uppercase tracking-wider text-stone-400 leading-none">Mã Phòng</div>
+                <div id="display-room-id" class="text-xs font-mono font-bold text-amber-300 tracking-widest">------</div>
+            </div>
+            <button id="btn-copy-room" title="Sao chép mã phòng" class="p-1.5 bg-stone-700 hover:bg-stone-600 active:scale-95 rounded-lg text-stone-200 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- MÀN HÌNH SẢNH CHỜ (LOBBY) -->
+    <main id="lobby-view" class="w-full max-w-md flex-1 flex flex-col justify-center px-4 py-6 gap-5">
+        <div class="bg-stone-800/90 border border-stone-700/80 rounded-2xl p-5 shadow-2xl text-center">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-amber-500 to-red-700 p-0.5 shadow-lg">
+                <div class="w-full h-full rounded-full bg-stone-900 flex items-center justify-center font-serif text-3xl font-black text-amber-400">
+                    將
+                </div>
+            </div>
+            <h2 class="text-xl font-bold text-white">Đấu Cờ Tướng 2 Người</h2>
+            <p class="text-xs text-stone-400 mt-1">Tạo phòng và chia sẻ mã 6 ký tự cho bạn bè trên điện thoại khác để cùng thi đấu.</p>
+
+            <!-- Tạo phòng mới -->
+            <div class="mt-6">
+                <button id="btn-create-room" disabled class="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 disabled:opacity-50 active:scale-[0.98] text-white font-bold rounded-xl shadow-lg shadow-red-900/30 transition flex items-center justify-center gap-2 text-base">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Tạo Phòng Mới (Cầm Quân Đỏ)
+                </button>
+            </div>
+
+            <div class="relative my-5 flex items-center justify-center">
+                <div class="border-t border-stone-700 w-full"></div>
+                <span class="bg-stone-800 px-3 text-xs text-stone-400 uppercase font-medium">Hoặc</span>
+                <div class="border-t border-stone-700 w-full"></div>
+            </div>
+
+            <!-- Tham gia phòng bằng mã -->
+            <div class="space-y-2.5">
+                <label for="input-room-code" class="block text-left text-xs font-medium text-stone-300">Nhập mã phòng từ đối thủ:</label>
+                <div class="flex gap-2">
+                    <input id="input-room-code" type="text" maxlength="6" placeholder="VD: A8K92P" autocomplete="off"
+                        class="flex-1 bg-stone-900 border border-stone-600 focus:border-amber-500 focus:outline-none rounded-xl px-3.5 py-3 text-center font-mono text-lg font-bold tracking-widest uppercase text-amber-300 placeholder-stone-600">
+                    <button id="btn-join-room" disabled class="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 active:scale-[0.98] text-white font-bold rounded-xl shadow-lg transition whitespace-nowrap">
+                        Vào Phòng
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chơi thử Offline 2 người trên 1 máy -->
+        <div class="text-center">
+            <button id="btn-local-mode" class="text-xs text-stone-400 hover:text-amber-400 underline underline-offset-4 py-2 transition">
+                Chơi thử 2 người trên cùng 1 màn hình (Offline)
+            </button>
+        </div>
+    </main>
+
+    <!-- MÀN HÌNH BÀN CỜ THI ĐẤU (GAME VIEW) -->
+    <section id="game-view" class="hidden w-full max-w-md flex-1 flex flex-col justify-between px-2.5 py-1.5 gap-1.5">
+        
+        <!-- THÔNG TIN ĐỐI THỦ (PHÍA TRÊN) -->
+        <div id="top-player-bar" class="flex items-center justify-between bg-stone-800/90 border border-stone-700/80 rounded-xl px-3 py-2 transition-all">
+            <div class="flex items-center gap-2.5">
+                <div id="top-avatar" class="w-8 h-8 rounded-full flex items-center justify-center font-serif font-bold text-base border-2 shadow">
+                    將
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span id="top-player-name" class="text-xs font-bold text-stone-200">Đối thủ (Đen)</span>
+                        <span id="top-status-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-stone-700 text-stone-300">Đang chờ...</span>
+                    </div>
+                    <div id="top-captured-list" class="text-[11px] text-stone-400 h-4 flex items-center gap-0.5 overflow-hidden">
+                        <!-- Quân đã ăn được -->
+                    </div>
+                </div>
+            </div>
+            <div id="top-turn-indicator" class="hidden px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[11px] font-bold animate-pulse">
+                Đang suy nghĩ...
+            </div>
+        </div>
+
+        <!-- THÔNG BÁO TRẠNG THÁI VÁN ĐẤU / CHIẾU TƯỚNG -->
+        <div id="game-banner" class="w-full py-1 px-3 rounded-lg bg-stone-800 border border-stone-700 text-center text-xs font-semibold text-amber-300 flex items-center justify-center gap-2 min-h-[28px]">
+            <span id="banner-text">Đang tải bàn cờ...</span>
+        </div>
+
+        <!-- KHUNG BÀN CỜ TƯỚNG (TỶ LỆ CHUẨN 9x10) -->
+        <div class="w-full flex items-center justify-center my-auto py-0.5">
+            <div id="board-wrapper" class="relative w-full aspect-[9/10] max-h-[62vh] wood-board rounded-xl p-[3.5%] select-none">
+                <!-- Lưới SVG vẽ đường kẻ bàn cờ, Cung Tướng, Sông Sở Hà Hán Giới -->
+                <svg id="board-svg" viewBox="0 0 800 900" class="w-full h-full block pointer-events-none">
+                    <!-- Viền ngoài đậm -->
+                    <rect x="0" y="0" width="800" height="900" fill="none" stroke="#451a03" stroke-width="5"/>
+                    
+                    <!-- Các đường ngang (10 hàng: y = 0, 100, ..., 900) -->
+                    <g stroke="#451a03" stroke-width="2.5">
+                        <line x1="0" y1="100" x2="800" y2="100"/>
+                        <line x1="0" y1="200" x2="800" y2="200"/>
+                        <line x1="0" y1="300" x2="800" y2="300"/>
+                        <line x1="0" y1="400" x2="800" y2="400"/>
+                        <line x1="0" y1="500" x2="800" y2="500"/>
+                        <line x1="0" y1="600" x2="800" y2="600"/>
+                        <line x1="0" y1="700" x2="800" y2="700"/>
+                        <line x1="0" y1="800" x2="800" y2="800"/>
+                    </g>
+
+                    <!-- Các đường dọc nửa trên (y: 0 -> 400) -->
+                    <g stroke="#451a03" stroke-width="2.5">
+                        <line x1="100" y1="0" x2="100" y2="400"/>
+                        <line x1="200" y1="0" x2="200" y2="400"/>
+                        <line x1="300" y1="0" x2="300" y2="400"/>
+                        <line x1="400" y1="0" x2="400" y2="400"/>
+                        <line x1="500" y1="0" x2="500" y2="400"/>
+                        <line x1="600" y1="0" x2="600" y2="400"/>
+                        <line x1="700" y1="0" x2="700" y2="400"/>
+                    </g>
+
+                    <!-- Các đường dọc nửa dưới (y: 500 -> 900) -->
+                    <g stroke="#451a03" stroke-width="2.5">
+                        <line x1="100" y1="500" x2="100" y2="900"/>
+                        <line x1="200" y1="500" x2="200" y2="900"/>
+                        <line x1="300" y1="500" x2="300" y2="900"/>
+                        <line x1="400" y1="500" x2="400" y2="900"/>
+                        <line x1="500" y1="500" x2="500" y2="900"/>
+                        <line x1="600" y1="500" x2="600" y2="900"/>
+                        <line x1="700" y1="500" x2="700" y2="900"/>
+                    </g>
+
+                    <!-- Đường chéo Cung Tướng trên & dưới -->
+                    <g stroke="#451a03" stroke-width="2.5">
+                        <line x1="300" y1="0" x2="500" y2="200"/>
+                        <line x1="500" y1="0" x2="300" y2="200"/>
+                        <line x1="300" y1="700" x2="500" y2="900"/>
+                        <line x1="500" y1="700" x2="300" y2="900"/>
+                    </g>
+
+                    <!-- Chữ Sở Hà - Hán Giới -->
+                    <g fill="#451a03" opacity="0.75" font-family="'Noto Serif', serif" font-size="44" font-weight="900" text-anchor="middle" dominant-baseline="central">
+                        <text x="200" y="450">楚 河</text>
+                        <text x="600" y="450">漢 界</text>
+                    </g>
+
+                    <!-- Các dấu hoa thị vị trí Pháo và Tốt -->
+                    <g id="board-markers" stroke="#451a03" stroke-width="2" fill="none"></g>
+                </svg>
+
+                <!-- Lớp tương tác: các điểm giao cắt (9x10 = 90 ô) & Quân cờ -->
+                <div id="board-interactive-layer" class="absolute inset-[3.5%]"></div>
+            </div>
+        </div>
+
+        <!-- THÔNG TIN NGƯỜI CHƠI (PHÍA DƯỚI - BẠN) -->
+        <div id="bottom-player-bar" class="flex items-center justify-between bg-stone-800/90 border border-stone-700/80 rounded-xl px-3 py-2 transition-all">
+            <div class="flex items-center gap-2.5">
+                <div id="bottom-avatar" class="w-8 h-8 rounded-full flex items-center justify-center font-serif font-bold text-base border-2 shadow">
+                    帥
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span id="bottom-player-name" class="text-xs font-bold text-white">Bạn (Đỏ)</span>
+                        <span id="bottom-role-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-800/60">Quân Đỏ</span>
+                    </div>
+                    <div id="bottom-captured-list" class="text-[11px] text-stone-400 h-4 flex items-center gap-0.5 overflow-hidden">
+                    </div>
+                </div>
+            </div>
+            <div id="bottom-turn-indicator" class="hidden px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/60 text-emerald-300 text-[11px] font-bold">
+                Lượt của bạn!
+            </div>
+        </div>
+
+        <!-- LỊCH SỬ NƯỚC ĐI & THANH CÔNG CỤ -->
+        <div class="bg-stone-800/80 border border-stone-700/70 rounded-xl p-2 space-y-2">
+            <!-- Dải lịch sử nước đi cuộn ngang -->
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-semibold uppercase text-stone-400 shrink-0">Nước đi:</span>
+                <div id="move-history-strip" class="flex-1 flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5 text-xs">
+                    <span class="text-stone-500 italic text-[11px]">Chưa có nước đi nào</span>
+                </div>
+            </div>
+
+            <!-- Các nút điều khiển trận đấu -->
+            <div class="grid grid-cols-4 gap-1.5">
+                <button id="btn-offer-draw" class="py-2 px-1 bg-stone-700 hover:bg-stone-600 active:scale-95 rounded-lg text-[11px] font-semibold text-stone-200 flex items-center justify-center gap-1 transition">
+                    <span>🤝</span> Xin hòa
+                </button>
+                <button id="btn-resign" class="py-2 px-1 bg-stone-700 hover:bg-red-900/80 active:scale-95 rounded-lg text-[11px] font-semibold text-red-300 flex items-center justify-center gap-1 transition">
+                    <span>🏳️</span> Đầu hàng
+                </button>
+                <button id="btn-new-game" class="py-2 px-1 bg-amber-700/80 hover:bg-amber-600 active:scale-95 rounded-lg text-[11px] font-semibold text-amber-100 flex items-center justify-center gap-1 transition">
+                    <span>🔄</span> Ván mới
+                </button>
+                <button id="btn-leave-room" class="py-2 px-1 bg-stone-900 hover:bg-stone-950 border border-stone-700 active:scale-95 rounded-lg text-[11px] font-semibold text-stone-400 flex items-center justify-center gap-1 transition">
+                    <span>🚪</span> Thoát
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- TOAST THÔNG BÁO NHANH -->
+    <div id="toast-container" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-11/12 max-w-sm"></div>
+
+    <!-- HỘP THOẠI XÁC NHẬN TÙY CHỈNH (THAY THẾ ALERT / CONFIRM) -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-stone-800 border border-stone-600 rounded-2xl max-w-xs w-full p-5 shadow-2xl text-center space-y-4">
+            <div id="modal-icon" class="text-3xl">🏆</div>
+            <h3 id="modal-title" class="text-lg font-bold text-white">Thông báo</h3>
+            <p id="modal-message" class="text-xs text-stone-300 leading-relaxed">Nội dung thông báo</p>
+            <div id="modal-actions" class="flex gap-2 justify-center pt-1">
+                <button id="modal-btn-cancel" class="flex-1 py-2.5 px-3 bg-stone-700 hover:bg-stone-600 text-stone-200 text-xs font-bold rounded-xl transition">Hủy</button>
+                <button id="modal-btn-confirm" class="flex-1 py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition">Đồng ý</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE & LOGIC GAME CỜ TƯỚNG -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // 1. KHỞI TẠO FIREBASE & XÁC THỰC NGƯỜI DÙNG
+        // ==========================================
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'xiangqi-online-vn';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        let app = null;
+        let auth = null;
+        let db = null;
+        let currentUser = null;
+        let isFirebaseReady = false;
+
+        async function initFirebase() {
+            if (!firebaseConfig) {
+                updateConnectionStatus('offline', 'Chế độ Offline (Chưa cấu hình Cloud)');
+                return;
+            }
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Xác thực ưu tiên custom token trước khi fallback sang ẩn danh
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUser = user;
+                        isFirebaseReady = true;
+                        updateConnectionStatus('online', 'Sẵn sàng đấu Online');
+                        document.getElementById('btn-create-room').disabled = false;
+                        document.getElementById('btn-join-room').disabled = false;
+                    }
+                });
+            } catch (err) {
+                console.error("Lỗi khởi tạo Firebase:", err);
+                updateConnectionStatus('error', 'Lỗi kết nối máy chủ');
+            }
+        }
+
+        function updateConnectionStatus(state, text) {
+            const dot = document.getElementById('conn-dot');
+            const label = document.getElementById('conn-text');
+            label.textContent = text;
+            dot.className = 'w-2 h-2 rounded-full ';
+            if (state === 'online') {
+                dot.className += 'bg-emerald-500 shadow-[0_0_6px_#10b981]';
+            } else if (state === 'error') {
+                dot.className += 'bg-red-500';
+            } else {
+                dot.className += 'bg-amber-500 animate-pulse';
+            }
+        }
+
+        // ==========================================
+        // 2. ĐỊNH NGHĨA QUÂN CỜ & BÀN CỜ CHUẨN
+        // ==========================================
+        // Ký hiệu quân:
+        // Chữ HOA = ĐỎ (Red - đi trước): K(Tướng 帥), A(Sĩ 仕), E(Tượng 相), R(Xe 俥), H(Mã 傌), C(Pháo 炮), P(Tốt 兵)
+        // Chữ thường = ĐEN (Black): k(Tướng 將), a(Sĩ 士), e(Tượng 象), r(Xe 車), h(Mã 馬), c(Pháo 砲), p(Tốt 卒)
+        const PIECE_LABELS = {
+            'K': '帥', 'A': '仕', 'E': '相', 'R': '俥', 'H': '傌', 'C': '炮', 'P': '兵',
+            'k': '將', 'a': '士', 'e': '象', 'r': '車', 'h': '馬', 'c': '砲', 'p': '卒'
+        };
+
+        const PIECE_NAMES_VI = {
+            'K': 'Tướng', 'A': 'Sĩ', 'E': 'Tượng', 'R': 'Xe', 'H': 'Mã', 'C': 'Pháo', 'P': 'Binh',
+            'k': 'Tướng', 'a': 'Sĩ', 'e': 'Tượng', 'r': 'Xe', 'h': 'Mã', 'c': 'Pháo', 'p': 'Tốt'
+        };
+
+        // Bàn cờ khởi đầu 10 hàng (0..9) x 9 cột (0..8)
+        // Hàng 0..4: Quân Đen (Phía trên theo góc nhìn chuẩn)
+        // Hàng 5..9: Quân Đỏ (Phía dưới theo góc nhìn chuẩn)
+        function createInitialBoard() {
+            return [
+                ['r', 'h', 'e', 'a', 'k', 'a', 'e', 'h', 'r'],
+                ['',  '',  '',  '',  '',  '',  '',  '',  ''],
+                ['',  'c', '',  '',  '',  '',  '',  'c', ''],
+                ['p', '',  'p', '',  'p', '',  'p', '',  'p'],
+                ['',  '',  '',  '',  '',  '',  '',  '',  ''],
+                ['',  '',  '',  '',  '',  '',  '',  '',  ''],
+                ['P', '',  'P', '',  'P', '',  'P', '',  'P'],
+                ['',  'C', '',  '',  '',  '',  '',  'C', ''],
+                ['',  '',  '',  '',  '',  '',  '',  '',  ''],
+                ['R', 'H', 'E', 'A', 'K', 'A', 'E', 'H', 'R']
+            ];
+        }
+
+        function isRedPiece(piece) {
+            return piece !== '' && piece === piece.toUpperCase();
+        }
+
+        function getPieceColor(piece) {
+            if (!piece) return null;
+            return isRedPiece(piece) ? 'red' : 'black';
+        }
+
+        function cloneBoard(board) {
+            return board.map(row => [...row]);
+        }
+
+        // ==========================================
+        // 3. BỘ LUẬT CỜ TƯỚNG ĐẦY ĐỦ (XIANGQI ENGINE)
+        // ==========================================
+        function isInsideBoard(r, c) {
+            return r >= 0 && r <= 9 && c >= 0 && c <= 8;
+        }
+
+        // Sinh các nước đi thô (chưa kiểm tra tự chiếu hoặc lộ mặt tướng)
+        function getPseudoLegalMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const color = getPieceColor(piece);
+            const type = piece.toUpperCase();
+            const moves = [];
+
+            const canLand = (tr, tc) => {
+                if (!isInsideBoard(tr, tc)) return false;
+                const target = board[tr][tc];
+                return !target || getPieceColor(target) !== color;
+            };
+
+            if (type === 'K') {
+                // Tướng: đi ngang dọc 1 bước trong Cung Tướng
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                for (const [dr, dc] of dirs) {
+                    const nr = r + dr, nc = c + dc;
+                    const inPalaceCol = nc >= 3 && nc <= 5;
+                    const inPalaceRow = color === 'red' ? (nr >= 7 && nr <= 9) : (nr >= 0 && nr <= 2);
+                    if (inPalaceCol && inPalaceRow && canLand(nr, nc)) {
+                        moves.push([nr, nc]);
+                    }
+                }
+            } else if (type === 'A') {
+                // Sĩ: đi chéo 1 bước trong Cung Tướng
+                const dirs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+                for (const [dr, dc] of dirs) {
+                    const nr = r + dr, nc = c + dc;
+                    const inPalaceCol = nc >= 3 && nc <= 5;
+                    const inPalaceRow = color === 'red' ? (nr >= 7 && nr <= 9) : (nr >= 0 && nr <= 2);
+                    if (inPalaceCol && inPalaceRow && canLand(nr, nc)) {
+                        moves.push([nr, nc]);
+                    }
+                }
+            } else if (type === 'E') {
+                // Tượng: đi chéo 2 ô (hình chữ Điền), không qua sông, kiểm tra cản mắt Tượng
+                const dirs = [[2, 2], [2, -2], [-2, 2], [-2, -2]];
+                for (const [dr, dc] of dirs) {
+                    const nr = r + dr, nc = c + dc;
+                    const eyeR = r + dr / 2, eyeC = c + dc / 2;
+                    if (!isInsideBoard(nr, nc)) continue;
+                    // Không được qua sông
+                    if (color === 'red' && nr < 5) continue;
+                    if (color === 'black' && nr > 4) continue;
+                    // Kiểm tra cản mắt Tượng
+                    if (board[eyeR][eyeC] === '' && canLand(nr, nc)) {
+                        moves.push([nr, nc]);
+                    }
+                }
+            } else if (type === 'H') {
+                // Mã: đi hình chữ Nhật (2+1), kiểm tra cản chân Mã
+                const horseSteps = [
+                    { dr: -2, dc: -1, blockR: -1, blockC: 0 },
+                    { dr: -2, dc:  1, blockR: -1, blockC: 0 },
+                    { dr:  2, dc: -1, blockR:  1, blockC: 0 },
+                    { dr:  2, dc:  1, blockR:  1, blockC: 0 },
+                    { dr: -1, dc: -2, blockR:  0, blockC: -1 },
+                    { dr:  1, dc: -2, blockR:  0, blockC: -1 },
+                    { dr: -1, dc:  2, blockR:  0, blockC:  1 },
+                    { dr:  1, dc:  2, blockR:  0, blockC:  1 }
+                ];
+                for (const step of horseSteps) {
+                    const nr = r + step.dr, nc = c + step.dc;
+                    const br = r + step.blockR, bc = c + step.blockC;
+                    if (isInsideBoard(nr, nc) && board[br][bc] === '' && canLand(nr, nc)) {
+                        moves.push([nr, nc]);
+                    }
+                }
+            } else if (type === 'R') {
+                // Xe: đi thẳng ngang dọc không giới hạn cho đến khi gặp vật cản
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                for (const [dr, dc] of dirs) {
+                    let nr = r + dr, nc = c + dc;
+                    while (isInsideBoard(nr, nc)) {
+                        if (board[nr][nc] === '') {
+                            moves.push([nr, nc]);
+                        } else {
+                            if (getPieceColor(board[nr][nc]) !== color) {
+                                moves.push([nr, nc]);
+                            }
+                            break;
+                        }
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+            } else if (type === 'C') {
+                // Pháo: đi như Xe, nhưng khi ăn quân phải nhảy qua đúng 1 quân làm ngòi
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                for (const [dr, dc] of dirs) {
+                    let nr = r + dr, nc = c + dc;
+                    let jumped = false;
+                    while (isInsideBoard(nr, nc)) {
+                        if (!jumped) {
+                            if (board[nr][nc] === '') {
+                                moves.push([nr, nc]);
+                            } else {
+                                jumped = true; // Gặp ngòi Pháo
+                            }
+                        } else {
+                            if (board[nr][nc] !== '') {
+                                if (getPieceColor(board[nr][nc]) !== color) {
+                                    moves.push([nr, nc]);
+                                }
+                                break; // Dù ăn hay gặp quân mình đều dừng sau ngòi
+                            }
+                        }
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+            } else if (type === 'P') {
+                // Tốt: chưa qua sông chỉ tiến 1 bước; qua sông được tiến, trái, phải 1 bước
+                const forward = color === 'red' ? -1 : 1;
+                const crossedRiver = color === 'red' ? (r <= 4) : (r >= 5);
+
+                if (canLand(r + forward, c)) {
+                    moves.push([r + forward, c]);
+                }
+                if (crossedRiver) {
+                    if (canLand(r, c - 1)) moves.push([r, c - 1]);
+                    if (canLand(r, c + 1)) moves.push([r, c + 1]);
+                }
+            }
+
+            return moves;
+        }
+
+        // Kiểm tra luật Lộ Mặt Tướng (2 Tướng đối diện trên cùng cột và không có quân nào ở giữa)
+        function areKingsFacing(board) {
+            let redKing = null, blackKing = null;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 3; c <= 5; c++) {
+                    if (board[r][c] === 'K') redKing = [r, c];
+                    if (board[r][c] === 'k') blackKing = [r, c];
+                }
+            }
+            if (!redKing || !blackKing) return false;
+            if (redKing[1] !== blackKing[1]) return false;
+
+            const col = redKing[1];
+            const minR = Math.min(redKing[0], blackKing[0]);
+            const maxR = Math.max(redKing[0], blackKing[0]);
+            for (let r = minR + 1; r < maxR; r++) {
+                if (board[r][col] !== '') return false;
+            }
+            return true;
+        }
+
+        // Kiểm tra phe `color` có đang bị Chiếu Tướng không
+        function isKingInCheck(board, color) {
+            const kingChar = color === 'red' ? 'K' : 'k';
+            let kingPos = null;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 3; c <= 5; c++) {
+                    if (board[r][c] === kingChar) {
+                        kingPos = [r, c];
+                        break;
+                    }
+                }
+                if (kingPos) break;
+            }
+            if (!kingPos) return true;
+
+            const opponentColor = color === 'red' ? 'black' : 'red';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const p = board[r][c];
+                    if (p && getPieceColor(p) === opponentColor) {
+                        const attacks = getPseudoLegalMoves(board, r, c);
+                        if (attacks.some(([ar, ac]) => ar === kingPos[0] && ac === kingPos[1])) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Lọc các nước đi hợp lệ tuyệt đối (không để Tướng bị chiếu, không lộ mặt Tướng)
+        function getLegalMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const color = getPieceColor(piece);
+            const pseudoMoves = getPseudoLegalMoves(board, r, c);
+
+            return pseudoMoves.filter(([tr, tc]) => {
+                const nextBoard = cloneBoard(board);
+                nextBoard[tr][tc] = piece;
+                nextBoard[r][c] = '';
+
+                if (areKingsFacing(nextBoard)) return false;
+                if (isKingInCheck(nextBoard, color)) return false;
+                return true;
+            });
+        }
+
+        // Kiểm tra phe `color` còn bất kỳ nước đi hợp lệ nào không (dùng phát hiện Chiếu Bí / Hết nước đi)
+        function hasAnyLegalMove(board, color) {
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const p = board[r][c];
+                    if (p && getPieceColor(p) === color) {
+                        if (getLegalMoves(board, r, c).length > 0) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Tạo ký hiệu nước đi tiếng Việt dễ đọc (VD: Pháo 2 bình 5, Mã 8 tấn 7)
+        function formatVietnameseNotation(board, fromR, fromC, toR, toC) {
+            const piece = board[fromR][fromC];
+            const color = getPieceColor(piece);
+            const name = PIECE_NAMES_VI[piece];
+
+            // Đánh số cột từ phải sang trái theo góc nhìn của từng phe (1..9)
+            const startCol = color === 'red' ? (9 - fromC) : (fromC + 1);
+            const endCol = color === 'red' ? (9 - toC) : (toC + 1);
+
+            let action = 'bình';
+            let targetVal = endCol;
+
+            if (fromR !== toR) {
+                const isAdvancing = color === 'red' ? (toR < fromR) : (toR > fromR);
+                action = isAdvancing ? 'tấn' : 'thoái';
+                // Với quân đi thẳng (Xe, Pháo, Tốt, Tướng), nếu đi cùng cột thì ghi số bước
+                const straightTypes = ['R', 'C', 'P', 'K'];
+                if (straightTypes.includes(piece.toUpperCase()) && fromC === toC) {
+                    targetVal = Math.abs(toR - fromR);
+                }
+            }
+            return `${name} ${startCol} ${action} ${targetVal}`;
+        }
+
+        // ==========================================
+        // 4. TRẠNG THÁI ỨNG DỤNG & ĐỒNG BỘ MULTIPLAYER
+        // ==========================================
+        let gameState = {
+            mode: 'lobby', // 'lobby' | 'online' | 'local'
+            roomId: null,
+            myColor: 'red', // 'red' | 'black'
+            board: createInitialBoard(),
+            turn: 'red',
+            status: 'waiting', // 'waiting' | 'playing' | 'finished'
+            winner: null, // 'red' | 'black' | 'draw' | null
+            winReason: '',
+            redPlayerId: null,
+            blackPlayerId: null,
+            lastMove: null, // { from: [r, c], to: [r, c] }
+            history: [],
+            capturedByRed: [],
+            capturedByBlack: [],
+            drawOfferBy: null,
+            rematchOfferBy: null
+        };
+
+        let selectedCell = null; // [r, c]
+        let validMovesForSelected = []; // [[r, c], ...]
+        let unsubscribeRoom = null;
+
+        // ==========================================
+        // 5. VẼ HOA THỊ BÀN CỜ & RENDER GIAO DIỆN
+        // ==========================================
+        function drawBoardMarkers() {
+            const container = document.getElementById('board-markers');
+            const markerPositions = [
+                // Vị trí Pháo
+                [2, 1], [2, 7], [7, 1], [7, 7],
+                // Vị trí Tốt
+                [3, 0], [3, 2], [3, 4], [3, 6], [3, 8],
+                [6, 0], [6, 2], [6, 4], [6, 6], [6, 8]
+            ];
+
+            let svgContent = '';
+            const d = 10; // Khoảng cách từ giao điểm
+            const l = 20; // Chiều dài cạnh góc
+
+            markerPositions.forEach(([r, c]) => {
+                const x = c * 100;
+                const y = r * 100;
+                // Góc trên trái & dưới trái (nếu c > 0)
+                if (c > 0) {
+                    svgContent += `<path d="M ${x - d - l} ${y - d} L ${x - d} ${y - d} L ${x - d} ${y - d - l}" />`;
+                    svgContent += `<path d="M ${x - d - l} ${y + d} L ${x - d} ${y + d} L ${x - d} ${y + d + l}" />`;
+                }
+                // Góc trên phải & dưới phải (nếu c < 8)
+                if (c < 8) {
+                    svgContent += `<path d="M ${x + d + l} ${y - d} L ${x + d} ${y - d} L ${x + d} ${y - d - l}" />`;
+                    svgContent += `<path d="M ${x + d + l} ${y + d} L ${x + d} ${y + d} L ${x + d} ${y + d + l}" />`;
+                }
+            });
+            container.innerHTML = svgContent;
+        }
+
+        // Chuyển đổi tọa độ logic (r, c) sang tọa độ hiển thị trên màn hình
+        // Nếu người chơi cầm quân Đen ở chế độ Online, xoay ngược bàn cờ 180 độ để quân Đen nằm phía dưới tiện thao tác!
+        function isBoardFlipped() {
+            return gameState.mode === 'online' && gameState.myColor === 'black';
+        }
+
+        function toDisplayCoords(r, c) {
+            if (isBoardFlipped()) {
+                return { dispR: 9 - r, dispC: 8 - c };
+            }
+            return { dispR: r, dispC: c };
+        }
+
+        function renderBoard() {
+            const layer = document.getElementById('board-interactive-layer');
+            layer.innerHTML = '';
+
+            const redChecked = isKingInCheck(gameState.board, 'red');
+            const blackChecked = isKingInCheck(gameState.board, 'black');
+
+            // Vẽ 90 điểm giao cắt trên bàn cờ
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const { dispR, dispC } = toDisplayCoords(r, c);
+                    const leftPct = (dispC / 8) * 100;
+                    const topPct = (dispR / 9) * 100;
+
+                    const cellWrapper = document.createElement('div');
+                    cellWrapper.style.left = `${leftPct}%`;
+                    cellWrapper.style.top = `${topPct}%`;
+                    cellWrapper.style.width = '11.2%';
+                    cellWrapper.style.height = '10.1%';
+                    cellWrapper.className = 'absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-10';
+
+                    const piece = gameState.board[r][c];
+                    const isSelected = selectedCell && selectedCell[0] === r && selectedCell[1] === c;
+                    const isValidDest = validMovesForSelected.some(([vr, vc]) => vr === r && vc === c);
+                    const isLastMoveCell = gameState.lastMove && (
+                        (gameState.lastMove.from[0] === r && gameState.lastMove.from[1] === c) ||
+                        (gameState.lastMove.to[0] === r && gameState.lastMove.to[1] === c)
+                    );
+
+                    // Đánh dấu vị trí xuất phát của nước đi vừa rồi
+                    if (isLastMoveCell && !piece) {
+                        const originMarker = document.createElement('div');
+                        originMarker.className = 'w-3 h-3 rounded-full border-2 border-sky-400 bg-sky-400/30 pointer-events-none';
+                        cellWrapper.appendChild(originMarker);
+                    }
+
+                    // Vẽ quân cờ nếu có
+                    if (piece) {
+                        const pColor = getPieceColor(piece);
+                        const pieceEl = document.createElement('div');
+                        let classes = `xiangqi-piece w-[92%] h-[92%] text-[clamp(16px,4.8vw,24px)] font-black select-none `;
+                        classes += pColor === 'red' ? 'piece-red ' : 'piece-black ';
+                        if (isSelected) classes += 'piece-selected ';
+                        if (isLastMoveCell) classes += 'piece-last-move ';
+                        if ((piece === 'K' && redChecked) || (piece === 'k' && blackChecked)) {
+                            classes += 'piece-in-check ';
+                        }
+
+                        pieceEl.className = classes;
+                        pieceEl.textContent = PIECE_LABELS[piece];
+                        cellWrapper.appendChild(pieceEl);
+
+                        // Nếu quân địch nằm trong tầm ăn của quân đang chọn
+                        if (isValidDest) {
+                            const ring = document.createElement('div');
+                            ring.className = 'capture-ring';
+                            cellWrapper.appendChild(ring);
+                        }
+                    } else if (isValidDest) {
+                        // Vẽ chấm xanh gợi ý ô trống có thể đi tới
+                        const dot = document.createElement('div');
+                        dot.className = 'valid-dot';
+                        cellWrapper.appendChild(dot);
+                    }
+
+                    // Gắn sự kiện chạm / click
+                    cellWrapper.addEventListener('click', () => handleCellTap(r, c));
+                    layer.appendChild(cellWrapper);
+                }
+            }
+        }
+
+        function renderPlayerPanels() {
+            const flipped = isBoardFlipped();
+            const topColor = flipped ? 'red' : 'black';
+            const bottomColor = flipped ? 'black' : 'red';
+
+            // Cấu hình thanh trên (Đối thủ)
+            const topAvatar = document.getElementById('top-avatar');
+            const topName = document.getElementById('top-player-name');
+            const topStatus = document.getElementById('top-status-badge');
+            const topTurn = document.getElementById('top-turn-indicator');
+            const topCaptured = document.getElementById('top-captured-list');
+
+            topAvatar.textContent = topColor === 'red' ? '帥' : '將';
+            topAvatar.className = `w-8 h-8 rounded-full flex items-center justify-center font-serif font-bold text-base border-2 shadow ${
+                topColor === 'red' ? 'bg-amber-100 text-red-600 border-red-600' : 'bg-amber-100 text-stone-900 border-stone-800'
+            }`;
+
+            if (gameState.mode === 'local') {
+                topName.textContent = 'Người chơi 2 (Đen)';
+                topStatus.textContent = 'Cùng máy';
+                topStatus.className = 'text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800';
+            } else {
+                topName.textContent = topColor === 'red' ? 'Đối thủ (Quân Đỏ)' : 'Đối thủ (Quân Đen)';
+                const opponentJoined = topColor === 'red' ? !!gameState.redPlayerId : !!gameState.blackPlayerId;
+                if (opponentJoined) {
+                    topStatus.textContent = 'Đã vào phòng';
+                    topStatus.className = 'text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800';
+                } else {
+                    topStatus.textContent = 'Đang chờ vào...';
+                    topStatus.className = 'text-[10px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 animate-pulse';
+                }
+            }
+
+            // Cấu hình thanh dưới (Bạn)
+            const botAvatar = document.getElementById('bottom-avatar');
+            const botName = document.getElementById('bottom-player-name');
+            const botBadge = document.getElementById('bottom-role-badge');
+            const botTurn = document.getElementById('bottom-turn-indicator');
+            const botCaptured = document.getElementById('bottom-captured-list');
+
+            botAvatar.textContent = bottomColor === 'red' ? '帥' : '將';
+            botAvatar.className = `w-8 h-8 rounded-full flex items-center justify-center font-serif font-bold text-base border-2 shadow ${
+                bottomColor === 'red' ? 'bg-amber-100 text-red-600 border-red-600' : 'bg-amber-100 text-stone-900 border-stone-800'
+            }`;
+
+            if (gameState.mode === 'local') {
+                botName.textContent = 'Người chơi 1 (Đỏ)';
+                botBadge.textContent = 'Quân Đỏ';
+                botBadge.className = 'text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-800/60';
+            } else {
+                botName.textContent = 'Bạn';
+                botBadge.textContent = bottomColor === 'red' ? 'Quân Đỏ (Đi trước)' : 'Quân Đen (Đi sau)';
+                botBadge.className = bottomColor === 'red'
+                    ? 'text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-800/60'
+                    : 'text-[10px] px-1.5 py-0.5 rounded bg-stone-900 text-stone-200 border border-stone-600';
+            }
+
+            // Hiển thị lượt đi
+            const isPlaying = gameState.status === 'playing';
+            topTurn.classList.toggle('hidden', !(isPlaying && gameState.turn === topColor));
+            botTurn.classList.toggle('hidden', !(isPlaying && gameState.turn === bottomColor));
+
+            // Hiển thị quân đã ăn
+            const topCapArr = topColor === 'red' ? gameState.capturedByRed : gameState.capturedByBlack;
+            const botCapArr = bottomColor === 'red' ? gameState.capturedByRed : gameState.capturedByBlack;
+            topCaptured.innerHTML = topCapArr.map(p => `<span class="font-serif ${isRedPiece(p) ? 'text-red-400' : 'text-stone-300'}">${PIECE_LABELS[p]}</span>`).join('');
+            botCaptured.innerHTML = botCapArr.map(p => `<span class="font-serif ${isRedPiece(p) ? 'text-red-400' : 'text-stone-300'}">${PIECE_LABELS[p]}</span>`).join('');
+
+            // Cập nhật Banner trạng thái
+            const bannerText = document.getElementById('banner-text');
+            const banner = document.getElementById('game-banner');
+            if (gameState.status === 'waiting') {
+                banner.className = 'w-full py-1 px-3 rounded-lg bg-amber-950/70 border border-amber-700/70 text-center text-xs font-semibold text-amber-300 flex items-center justify-center gap-2 min-h-[28px]';
+                bannerText.textContent = `Chia sẻ mã phòng [${gameState.roomId}] cho bạn bè để bắt đầu!`;
+            } else if (gameState.status === 'finished') {
+                banner.className = 'w-full py-1 px-3 rounded-lg bg-red-950/80 border border-red-600 text-center text-xs font-bold text-amber-200 flex items-center justify-center gap-2 min-h-[28px]';
+                bannerText.textContent = gameState.winReason || 'Ván đấu đã kết thúc!';
+            } else {
+                const inCheck = isKingInCheck(gameState.board, gameState.turn);
+                if (inCheck) {
+                    banner.className = 'w-full py-1 px-3 rounded-lg bg-red-900/90 border border-red-500 text-center text-xs font-extrabold text-white animate-pulse flex items-center justify-center gap-2 min-h-[28px]';
+                    bannerText.textContent = `⚠️ CHIẾU TƯỚNG! Lượt phe ${gameState.turn === 'red' ? 'ĐỎ' : 'ĐEN'}`;
+                } else {
+                    banner.className = 'w-full py-1 px-3 rounded-lg bg-stone-800 border border-stone-700 text-center text-xs font-semibold text-stone-200 flex items-center justify-center gap-2 min-h-[28px]';
+                    if (gameState.mode === 'local') {
+                        bannerText.textContent = `Lượt đi: Phe ${gameState.turn === 'red' ? 'ĐỎ (帥)' : 'ĐEN (將)'}`;
+                    } else {
+                        bannerText.textContent = gameState.turn === gameState.myColor
+                            ? '✨ Đến lượt của bạn — Hãy chọn quân cờ'
+                            : '⏳ Đang chờ đối thủ đi nước tiếp theo...';
+                    }
+                }
+            }
+        }
+
+        function renderHistory() {
+            const strip = document.getElementById('move-history-strip');
+            if (!gameState.history || gameState.history.length === 0) {
+                strip.innerHTML = '<span class="text-stone-500 italic text-[11px]">Chưa có nước đi nào</span>';
+                return;
+            }
+            strip.innerHTML = gameState.history.map((item, idx) => {
+                const isRed = item.color === 'red';
+                return `<span class="shrink-0 px-2 py-0.5 rounded bg-stone-900 border ${isRed ? 'border-red-900/60 text-red-300' : 'border-stone-700 text-stone-300'} font-mono text-[11px]">
+                    ${idx + 1}. ${item.notation}
+                </span>`;
+            }).join('');
+            strip.scrollLeft = strip.scrollWidth;
+        }
+
+        function renderAll() {
+            renderBoard();
+            renderPlayerPanels();
+            renderHistory();
+        }
+
+        // ==========================================
+        // 6. XỬ LÝ TƯƠNG TÁC CHỌN & DI CHUYỂN QUÂN CỜ
+        // ==========================================
+        async function handleCellTap(r, c) {
+            if (gameState.status !== 'playing') {
+                if (gameState.status === 'waiting') {
+                    showToast('Đang chờ đối thủ vào phòng!', 'info');
+                }
+                return;
+            }
+
+            // Kiểm tra quyền đi lượt hiện tại
+            if (gameState.mode === 'online' && gameState.turn !== gameState.myColor) {
+                showToast('Chưa đến lượt của bạn!', 'warning');
+                return;
+            }
+
+            const tappedPiece = gameState.board[r][c];
+            const tappedColor = getPieceColor(tappedPiece);
+
+            // Trường hợp 1: Chạm vào quân cờ cùng phe với lượt hiện tại -> Chọn quân đó
+            if (tappedPiece && tappedColor === gameState.turn) {
+                if (selectedCell && selectedCell[0] === r && selectedCell[1] === c) {
+                    // Bỏ chọn nếu chạm lại chính quân đang chọn
+                    selectedCell = null;
+                    validMovesForSelected = [];
+                } else {
+                    selectedCell = [r, c];
+                    validMovesForSelected = getLegalMoves(gameState.board, r, c);
+                }
+                renderBoard();
+                return;
+            }
+
+            // Trường hợp 2: Đã chọn quân và chạm vào ô đích hợp lệ -> Thực hiện nước đi
+            if (selectedCell) {
+                const isValid = validMovesForSelected.some(([vr, vc]) => vr === r && vc === c);
+                if (isValid) {
+                    await executeMove(selectedCell[0], selectedCell[1], r, c);
+                } else {
+                    // Chạm ra ngoài vùng hợp lệ -> Bỏ chọn
+                    selectedCell = null;
+                    validMovesForSelected = [];
+                    renderBoard();
+                }
+            }
+        }
+
+        async function executeMove(fromR, fromC, toR, toC) {
+            const movingPiece = gameState.board[fromR][fromC];
+            const capturedPiece = gameState.board[toR][toC];
+            const moverColor = getPieceColor(movingPiece);
+            const nextTurn = moverColor === 'red' ? 'black' : 'red';
+            const notation = formatVietnameseNotation(gameState.board, fromR, fromC, toR, toC);
+
+            const nextBoard = cloneBoard(gameState.board);
+            nextBoard[toR][toC] = movingPiece;
+            nextBoard[fromR][fromC] = '';
+
+            const nextCapturedByRed = [...gameState.capturedByRed];
+            const nextCapturedByBlack = [...gameState.capturedByBlack];
+            if (capturedPiece) {
+                if (moverColor === 'red') nextCapturedByRed.push(capturedPiece);
+                else nextCapturedByBlack.push(capturedPiece);
+            }
+
+            const nextHistory = [...gameState.history, { color: moverColor, notation }];
+
+            // Kiểm tra điều kiện kết thúc ván cờ (Chiếu bí hoặc Hết nước đi hợp lệ)
+            let nextStatus = 'playing';
+            let nextWinner = null;
+            let nextWinReason = '';
+
+            const opponentHasMoves = hasAnyLegalMove(nextBoard, nextTurn);
+            if (!opponentHasMoves) {
+                nextStatus = 'finished';
+                nextWinner = moverColor;
+                const opponentInCheck = isKingInCheck(nextBoard, nextTurn);
+                const winnerLabel = moverColor === 'red' ? 'PHE ĐỎ' : 'PHE ĐEN';
+                nextWinReason = opponentInCheck
+                    ? `🏆 CHIẾU BÍ! ${winnerLabel} giành chiến thắng!`
+                    : `🏆 HẾT NƯỚC ĐI! ${winnerLabel} giành chiến thắng!`;
+            }
+
+            selectedCell = null;
+            validMovesForSelected = [];
+
+            if (gameState.mode === 'local') {
+                gameState.board = nextBoard;
+                gameState.turn = nextTurn;
+                gameState.lastMove = { from: [fromR, fromC], to: [toR, toC] };
+                gameState.history = nextHistory;
+                gameState.capturedByRed = nextCapturedByRed;
+                gameState.capturedByBlack = nextCapturedByBlack;
+                gameState.status = nextStatus;
+                gameState.winner = nextWinner;
+                gameState.winReason = nextWinReason;
+                renderAll();
+                if (nextStatus === 'finished') {
+                    showModal('🏆', 'Kết Thúc Ván Đấu', nextWinReason, false);
+                }
+            } else if (gameState.mode === 'online' && isFirebaseReady && currentUser) {
+                // Cập nhật lên Firestore (lưu board dưới dạng JSON string để tránh lỗi mảng lồng nhau)
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', gameState.roomId);
+                try {
+                    await updateDoc(roomRef, {
+                        boardJson: JSON.stringify(nextBoard),
+                        turn: nextTurn,
+                        lastMove: { from: [fromR, fromC], to: [toR, toC] },
+                        history: nextHistory,
+                        capturedByRed: nextCapturedByRed,
+                        capturedByBlack: nextCapturedByBlack,
+                        status: nextStatus,
+                        winner: nextWinner,
+                        winReason: nextWinReason,
+                        drawOfferBy: null // Xóa đề nghị hòa cũ khi có nước đi mới
+                    });
+                } catch (err) {
+                    console.error("Lỗi đồng bộ nước đi:", err);
+                    showToast('Lỗi mạng! Không thể gửi nước đi.', 'error');
+                }
+            }
+        }
+
+        // ==========================================
+        // 7. QUẢN LÝ PHÒNG ONLINE (FIRESTORE)
+        // ==========================================
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        async function createOnlineRoom() {
+            if (!isFirebaseReady || !currentUser) {
+                showToast('Chưa kết nối được máy chủ!', 'error');
+                return;
+            }
+
+            const roomId = generateRoomCode();
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', roomId);
+            const initialBoard = createInitialBoard();
+
+            const roomData = {
+                roomId,
+                boardJson: JSON.stringify(initialBoard),
+                turn: 'red',
+                status: 'waiting',
+                winner: null,
+                winReason: '',
+                redPlayerId: currentUser.uid,
+                blackPlayerId: null,
+                lastMove: null,
+                history: [],
+                capturedByRed: [],
+                capturedByBlack: [],
+                drawOfferBy: null,
+                rematchOfferBy: null,
+                createdAt: Date.now()
+            };
+
+            try {
+                await setDoc(roomRef, roomData);
+                enterGameView('online', roomId, 'red');
+                subscribeToRoom(roomId);
+                showToast(`Đã tạo phòng ${roomId}!`, 'success');
+            } catch (err) {
+                console.error("Lỗi tạo phòng:", err);
+                showToast('Không thể tạo phòng. Vui lòng thử lại.', 'error');
+            }
+        }
+
+        async function joinOnlineRoom() {
+            if (!isFirebaseReady || !currentUser) {
+                showToast('Chưa kết nối được máy chủ!', 'error');
+                return;
+            }
+
+            const rawInput = document.getElementById('input-room-code').value.trim().toUpperCase();
+            if (rawInput.length < 4) {
+                showToast('Vui lòng nhập mã phòng hợp lệ!', 'warning');
+                return;
+            }
+
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', rawInput);
+            try {
+                const snap = await getDoc(roomRef);
+                if (!snap.exists()) {
+                    showToast('Không tìm thấy phòng với mã này!', 'error');
+                    return;
+                }
+
+                const data = snap.data();
+                let assignedColor = null;
+
+                if (data.redPlayerId === currentUser.uid) {
+                    assignedColor = 'red';
+                } else if (data.blackPlayerId === currentUser.uid) {
+                    assignedColor = 'black';
+                } else if (!data.blackPlayerId) {
+                    assignedColor = 'black';
+                    await updateDoc(roomRef, {
+                        blackPlayerId: currentUser.uid,
+                        status: 'playing'
+                    });
+                } else {
+                    showToast('Phòng này đã đủ 2 người chơi!', 'error');
+                    return;
+                }
+
+                enterGameView('online', rawInput, assignedColor);
+                subscribeToRoom(rawInput);
+                showToast(`Đã vào phòng ${rawInput}!`, 'success');
+            } catch (err) {
+                console.error("Lỗi vào phòng:", err);
+                showToast('Lỗi kết nối khi vào phòng.', 'error');
+            }
+        }
+
+        let lastShownEndReason = '';
+        let lastDrawOfferHandled = null;
+        let lastRematchOfferHandled = null;
+
+        function subscribeToRoom(roomId) {
+            if (unsubscribeRoom) unsubscribeRoom();
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', roomId);
+
+            unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+
+                gameState.roomId = data.roomId;
+                gameState.board = JSON.parse(data.boardJson);
+                gameState.turn = data.turn;
+                gameState.status = data.status;
+                gameState.winner = data.winner;
+                gameState.winReason = data.winReason;
+                gameState.redPlayerId = data.redPlayerId;
+                gameState.blackPlayerId = data.blackPlayerId;
+                gameState.lastMove = data.lastMove;
+                gameState.history = data.history || [];
+                gameState.capturedByRed = data.capturedByRed || [];
+                gameState.capturedByBlack = data.capturedByBlack || [];
+                gameState.drawOfferBy = data.drawOfferBy;
+                gameState.rematchOfferBy = data.rematchOfferBy;
+
+                renderAll();
+
+                // Hiển thị thông báo kết thúc ván 1 lần duy nhất
+                if (data.status === 'finished' && data.winReason && lastShownEndReason !== data.winReason) {
+                    lastShownEndReason = data.winReason;
+                    showModal('🏆', 'Kết Thúc Ván Đấu', data.winReason, false);
+                } else if (data.status === 'playing') {
+                    lastShownEndReason = '';
+                }
+
+                // Xử lý lời mời Xin Hòa từ đối thủ
+                if (data.drawOfferBy && data.drawOfferBy !== gameState.myColor && lastDrawOfferHandled !== data.drawOfferBy) {
+                    lastDrawOfferHandled = data.drawOfferBy;
+                    showModal('🤝', 'Đối Thủ Xin Hòa', 'Đối thủ đề nghị hòa ván cờ này. Bạn có đồng ý không?', true, async () => {
+                        await updateDoc(roomRef, {
+                            status: 'finished',
+                            winner: 'draw',
+                            winReason: '🤝 Hai bên đã thỏa thuận HÒA!',
+                            drawOfferBy: null
+                        });
+                    }, async () => {
+                        await updateDoc(roomRef, { drawOfferBy: null });
+                        lastDrawOfferHandled = null;
+                    });
+                } else if (!data.drawOfferBy) {
+                    lastDrawOfferHandled = null;
+                }
+
+                // Xử lý lời mời Chơi Ván Mới từ đối thủ
+                if (data.rematchOfferBy && data.rematchOfferBy !== gameState.myColor && lastRematchOfferHandled !== data.rematchOfferBy) {
+                    lastRematchOfferHandled = data.rematchOfferBy;
+                    showModal('🔄', 'Mời Chơi Ván Mới', 'Đối thủ muốn bắt đầu lại ván cờ mới. Bạn có đồng ý?', true, async () => {
+                        await resetOnlineRoom(roomRef);
+                    }, async () => {
+                        await updateDoc(roomRef, { rematchOfferBy: null });
+                        lastRematchOfferHandled = null;
+                    });
+                } else if (!data.rematchOfferBy) {
+                    lastRematchOfferHandled = null;
+                }
+            }, (error) => {
+                console.error("Lỗi lắng nghe phòng:", error);
+                showToast('Mất kết nối đồng bộ phòng!', 'error');
+            });
+        }
+
+        async function resetOnlineRoom(roomRef) {
+            await updateDoc(roomRef, {
+                boardJson: JSON.stringify(createInitialBoard()),
+                turn: 'red',
+                status: 'playing',
+                winner: null,
+                winReason: '',
+                lastMove: null,
+                history: [],
+                capturedByRed: [],
+                capturedByBlack: [],
+                drawOfferBy: null,
+                rematchOfferBy: null
+            });
+            selectedCell = null;
+            validMovesForSelected = [];
+            showToast('Đã bắt đầu ván mới!', 'success');
+        }
+
+        // ==========================================
+        // 8. ĐIỀU HƯỚNG GIAO DIỆN & NÚT CHỨC NĂNG
+        // ==========================================
+        function enterGameView(mode, roomId, myColor) {
+            gameState.mode = mode;
+            gameState.roomId = roomId;
+            gameState.myColor = myColor;
+            gameState.board = createInitialBoard();
+            gameState.turn = 'red';
+            gameState.status = mode === 'local' ? 'playing' : 'waiting';
+            gameState.winner = null;
+            gameState.winReason = '';
+            gameState.lastMove = null;
+            gameState.history = [];
+            gameState.capturedByRed = [];
+            gameState.capturedByBlack = [];
+            selectedCell = null;
+            validMovesForSelected = [];
+
+            document.getElementById('lobby-view').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
+
+            const roomBadge = document.getElementById('header-room-badge');
+            if (mode === 'online') {
+                roomBadge.classList.remove('hidden');
+                roomBadge.classList.add('flex');
+                document.getElementById('display-room-id').textContent = roomId;
+            } else {
+                roomBadge.classList.add('hidden');
+                roomBadge.classList.remove('flex');
+            }
+
+            renderAll();
+        }
+
+        function leaveToLobby() {
+            if (unsubscribeRoom) {
+                unsubscribeRoom();
+                unsubscribeRoom = null;
+            }
+            gameState.mode = 'lobby';
+            gameState.roomId = null;
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('lobby-view').classList.remove('hidden');
+            document.getElementById('header-room-badge').classList.add('hidden');
+            document.getElementById('header-room-badge').classList.remove('flex');
+        }
+
+        // Nút Xin Hòa
+        document.getElementById('btn-offer-draw').addEventListener('click', () => {
+            if (gameState.status !== 'playing') return;
+            if (gameState.mode === 'local') {
+                showModal('🤝', 'Xác Nhận Hòa', 'Hai người chơi đồng ý hòa ván này?', true, () => {
+                    gameState.status = 'finished';
+                    gameState.winner = 'draw';
+                    gameState.winReason = '🤝 Hai bên đã thỏa thuận HÒA!';
+                    renderAll();
+                });
+            } else if (gameState.mode === 'online') {
+                showModal('🤝', 'Gửi Lời Xin Hòa', 'Bạn muốn gửi đề nghị hòa tới đối thủ?', true, async () => {
+                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', gameState.roomId);
+                    await updateDoc(roomRef, { drawOfferBy: gameState.myColor });
+                    showToast('Đã gửi lời xin hòa tới đối thủ!', 'info');
+                });
+            }
+        });
+
+        // Nút Đầu Hàng
+        document.getElementById('btn-resign').addEventListener('click', () => {
+            if (gameState.status !== 'playing') return;
+            showModal('🏳️', 'Xác Nhận Đầu Hàng', 'Bạn chắc chắn muốn nhận thua ván cờ này?', true, async () => {
+                if (gameState.mode === 'local') {
+                    const loser = gameState.turn;
+                    const winner = loser === 'red' ? 'black' : 'red';
+                    gameState.status = 'finished';
+                    gameState.winner = winner;
+                    gameState.winReason = `🏳️ Phe ${loser === 'red' ? 'ĐỎ' : 'ĐEN'} đầu hàng! Phe ${winner === 'red' ? 'ĐỎ' : 'ĐEN'} thắng!`;
+                    renderAll();
+                } else if (gameState.mode === 'online') {
+                    const winner = gameState.myColor === 'red' ? 'black' : 'red';
+                    const loserName = gameState.myColor === 'red' ? 'PHE ĐỎ' : 'PHE ĐEN';
+                    const winnerName = winner === 'red' ? 'PHE ĐỎ' : 'PHE ĐEN';
+                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', gameState.roomId);
+                    await updateDoc(roomRef, {
+                        status: 'finished',
+                        winner,
+                        winReason: `🏳️ ${loserName} đã đầu hàng! ${winnerName} thắng!`
+                    });
+                }
+            });
+        });
+
+        // Nút Ván Mới
+        document.getElementById('btn-new-game').addEventListener('click', () => {
+            if (gameState.mode === 'local') {
+                showModal('🔄', 'Chơi Ván Mới', 'Bắt đầu lại bàn cờ từ đầu?', true, () => {
+                    enterGameView('local', null, 'red');
+                });
+            } else if (gameState.mode === 'online') {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'xiangqi_rooms', gameState.roomId);
+                if (gameState.status === 'finished') {
+                    showModal('🔄', 'Đấu Ván Mới', 'Gửi yêu cầu chơi ván mới tới đối thủ?', true, async () => {
+                        await updateDoc(roomRef, { rematchOfferBy: gameState.myColor });
+                        showToast('Đã gửi lời mời đấu ván mới!', 'info');
+                    });
+                } else {
+                    showModal('🔄', 'Đề Nghị Ván Mới', 'Ván đấu chưa kết thúc. Gửi lời mời làm lại ván mới tới đối thủ?', true, async () => {
+                        await updateDoc(roomRef, { rematchOfferBy: gameState.myColor });
+                        showToast('Đã gửi lời mời làm lại ván mới!', 'info');
+                    });
+                }
+            }
+        });
+
+        // Nút Thoát Phòng
+        document.getElementById('btn-leave-room').addEventListener('click', () => {
+            showModal('🚪', 'Thoát Khỏi Trận', 'Bạn muốn quay về màn hình chính?', true, () => {
+                leaveToLobby();
+            });
+        });
+
+        // Sao chép mã phòng (dùng document.execCommand('copy') tương thích iFrame)
+        document.getElementById('btn-copy-room').addEventListener('click', () => {
+            if (!gameState.roomId) return;
+            const tempInput = document.createElement('input');
+            tempInput.value = gameState.roomId;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                showToast(`Đã sao chép mã phòng: ${gameState.roomId}`, 'success');
+            } catch (e) {
+                showToast('Không thể sao chép tự động', 'error');
+            }
+            document.body.removeChild(tempInput);
+        });
+
+        // Các nút ở Lobby
+        document.getElementById('btn-create-room').addEventListener('click', createOnlineRoom);
+        document.getElementById('btn-join-room').addEventListener('click', joinOnlineRoom);
+        document.getElementById('btn-local-mode').addEventListener('click', () => {
+            enterGameView('local', null, 'red');
+        });
+
+        // ==========================================
+        // 9. HỆ THỐNG TOAST & MODAL THÔNG BÁO
+        // ==========================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let bgClass = 'bg-stone-800 border-stone-600 text-stone-100';
+            if (type === 'success') bgClass = 'bg-emerald-900/95 border-emerald-500 text-emerald-100';
+            if (type === 'error') bgClass = 'bg-red-900/95 border-red-500 text-red-100';
+            if (type === 'warning') bgClass = 'bg-amber-900/95 border-amber-500 text-amber-100';
+
+            toast.className = `px-4 py-2 rounded-full border shadow-xl text-xs font-semibold transition-all duration-300 ${bgClass}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        function showModal(icon, title, message, showCancel = true, onConfirm = null, onCancel = null) {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-icon').textContent = icon;
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+
+            const btnCancel = document.getElementById('modal-btn-cancel');
+            const btnConfirm = document.getElementById('modal-btn-confirm');
+
+            btnCancel.classList.toggle('hidden', !showCancel);
+
+            const closeModal = () => modal.classList.add('hidden');
+
+            btnConfirm.onclick = () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            };
+            btnCancel.onclick = () => {
+                closeModal();
+                if (onCancel) onCancel();
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+        // Khởi chạy ứng dụng
+        drawBoardMarkers();
+        initFirebase();
+    </script>
+</body>
+</html>
