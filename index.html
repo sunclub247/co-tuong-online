@@ -966,3 +966,139 @@
                         if (!jumped) { if (!board[nr][nc]) moves.push({r: nr, c: nc}); else jumped = true; }
                         else { if (board[nr][nc]) { if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc}); break; } }
                         nr += dr; nc += dc;
+                    }
+                });
+            } else if (type === 'HORSE') {
+                [
+                    {dr: -2, dc: -1, lr: -1, lc: 0}, {dr: -2, dc: 1, lr: -1, lc: 0},
+                    {dr: 2, dc: -1, lr: 1, lc: 0},   {dr: 2, dc: 1, lr: 1, lc: 0},
+                    {dr: -1, dc: -2, lr: 0, lc: -1}, {dr: 1, dc: -2, lr: 0, lc: -1},
+                    {dr: -1, dc: 2, lr: 0, lc: 1},   {dr: 1, dc: 2, lr: 0, lc: 1}
+                ].forEach(j => {
+                    if (r + j.dr >= 0 && r + j.dr <= 9 && c + j.dc >= 0 && c + j.dc <= 8 && !board[r + j.lr][c + j.lc]) {
+                        if (isEnemyOrEmpty(r + j.dr, c + j.dc)) moves.push({r: r + j.dr, c: c + j.dc});
+                    }
+                });
+            } else if (type === 'ELEPHANT') {
+                [
+                    {dr: -2, dc: -2, er: -1, ec: -1}, {dr: -2, dc: 2, er: -1, ec: 1},
+                    {dr: 2, dc: -2, er: 1, ec: -1},   {dr: 2, dc: 2, er: 1, ec: 1}
+                ].forEach(s => {
+                    const nr = r + s.dr, nc = c + s.dc;
+                    const inOwn = isRed ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4);
+                    if (inOwn && nc >= 0 && nc <= 8 && !board[r + s.er][c + s.ec] && isEnemyOrEmpty(nr, nc)) {
+                        moves.push({r: nr, c: nc});
+                    }
+                });
+            } else if (type === 'ADVISOR' || type === 'GENERAL') {
+                [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+                    const nr = r + dr, nc = c + dc;
+                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
+                    if (type === 'ADVISOR') {
+                        const diag = [[-1,-1],[-1,1],[1,-1],[1,1]].some(d => d[0] === dr && d[1] === dc);
+                        if (!diag) return;
+                    }
+                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                });
+            } else if (type === 'PAWN') {
+                const forward = isRed ? -1 : 1;
+                if (isEnemyOrEmpty(r + forward, c)) moves.push({r: r + forward, c});
+                if (isRed ? r <= 4 : r >= 5) {
+                    if (isEnemyOrEmpty(r, c - 1)) moves.push({r, c: c - 1});
+                    if (isEnemyOrEmpty(r, c + 1)) moves.push({r, c: c + 1});
+                }
+            }
+            return moves;
+        }
+
+        function isKingInCheck(board, color) {
+            const kingName = color === 'red' ? 'R_GENERAL' : 'B_GENERAL';
+            const oppKing = color === 'red' ? 'B_GENERAL' : 'R_GENERAL';
+            let kr = -1, kc = -1, okr = -1, okc = -1;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] === kingName) { kr = r; kc = c; }
+                    if (board[r][c] === oppKing) { okr = r; okc = c; }
+                }
+            }
+            if (kr === -1) return true;
+            if (kc === okc && okr !== -1) {
+                let blocked = false;
+                for (let i = Math.min(kr, okr) + 1; i < Math.max(kr, okr); i++) {
+                    if (board[i][kc]) { blocked = true; break; }
+                }
+                if (!blocked) return true;
+            }
+            const oppPrefix = color === 'red' ? 'B_' : 'R_';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] && board[r][c].startsWith(oppPrefix)) {
+                        if (getPseudoMoves(board, r, c).some(m => m.r === kr && m.c === kc)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function getLegalMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const color = piece.startsWith('R_') ? 'red' : 'black';
+            return getPseudoMoves(board, r, c).filter(m => {
+                const copy = board.map(row => [...row]);
+                copy[m.r][m.c] = copy[r][c];
+                copy[r][c] = null;
+                return !isKingInCheck(copy, color);
+            });
+        }
+
+        function evaluateTurnState() {
+            if (isKingInCheck(boardState, currentTurn)) document.getElementById('check-alert').classList.remove('hidden');
+            else document.getElementById('check-alert').classList.add('hidden');
+
+            const prefix = currentTurn === 'red' ? 'R_' : 'B_';
+            let hasAny = false;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (boardState[r][c] && boardState[r][c].startsWith(prefix)) {
+                        if (getLegalMoves(boardState, r, c).length > 0) { hasAny = true; break; }
+                    }
+                }
+                if (hasAny) break;
+            }
+
+            if (!hasAny) {
+                const winner = currentTurn === 'red' ? 'black' : 'red';
+                if (winner === myColor) {
+                    showEndModal('🏆', 'Chiếu Bí - Thắng!', 'Đối thủ hết nước đi.');
+                    updateStatsOnCloud('win');
+                } else {
+                    showEndModal('🏳️', 'Thua Cuộc!', 'Bạn đã bị chiếu bí.');
+                    updateStatsOnCloud('loss');
+                }
+            }
+        }
+
+        function showEndModal(icon, title, desc) {
+            gameOver = true;
+            stopTimer();
+            document.getElementById('end-icon').innerText = icon;
+            document.getElementById('end-title').innerText = title;
+            document.getElementById('end-desc').innerText = desc;
+            document.getElementById('end-modal').classList.remove('hidden');
+        }
+
+        function surrender() {
+            if (confirm('Bạn có chắc muốn đầu hàng?')) {
+                if (conn && conn.open) conn.send({ type: 'SURRENDER' });
+                showEndModal('🏳️', 'Đã Đầu Hàng', 'Bạn đã thua trận này.');
+                updateStatsOnCloud('loss');
+            }
+        }
+
+        function requestDraw() {
+            if (conn && conn.open) { conn.send({ type: 'DRAW_REQ' }); alert('Đã gửi yêu cầu hòa.'); }
+        }
+    </script>
+</body>
+</html>
