@@ -31,4 +31,387 @@
 
         .piece {
             transition: all 0.15s ease-in-out;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.6);
+        }
+    </style>
+</head>
+<body class="bg-amber-950 text-amber-100 font-sans select-none min-h-screen flex flex-col items-center justify-between p-2">
+
+    <!-- HEADER -->
+    <header class="w-full max-w-md flex justify-between items-center bg-amber-900/90 px-4 py-2 rounded-xl shadow border border-amber-700/50">
+        <h1 class="text-lg font-bold tracking-wider text-amber-300" style="font-family: 'Noto Serif TC', serif;">🇨🇳 CỜ TƯỚNG ONLINE</h1>
+        <div id="connection-status" class="flex items-center gap-2 bg-amber-950/80 px-3 py-1 rounded-full text-xs border border-amber-700">
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="status-text">Đang kết nối Cloud...</span>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="w-full max-w-md flex-1 flex flex-col items-center justify-center my-2">
+
+        <!-- LOBBY SCREEN -->
+        <div id="lobby-screen" class="w-full bg-amber-900/95 p-5 rounded-2xl shadow-2xl border border-amber-700 space-y-4">
+            <div class="text-center space-y-1">
+                <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Phòng Đấu Trực Tuyến</h2>
+                <p class="text-xs text-amber-300/80">Chơi trực tiếp giữa 2 điện thoại qua Internet</p>
+            </div>
+
+            <div class="space-y-3 pt-2">
+                <div>
+                    <label class="block text-xs font-medium text-amber-300 mb-1">Tên hiển thị của bạn:</label>
+                    <input type="text" id="player-name" value="Kỳ Thủ" class="w-full bg-amber-950 border border-amber-700 rounded-lg px-3 py-2 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
+                </div>
+
+                <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                    <span>🏠 Tạo Phòng Mới</span>
+                </button>
+
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-amber-700"></div>
+                    <span class="flex-shrink mx-4 text-xs text-amber-400 uppercase">Hoặc vào phòng</span>
+                    <div class="flex-grow border-t border-amber-700"></div>
+                </div>
+
+                <div class="space-y-2">
+                    <input type="text" id="room-code-input" placeholder="Nhập mã phòng 6 ký tự..." class="w-full uppercase text-center tracking-widest bg-amber-950 border border-amber-700 rounded-lg px-3 py-2 text-sm font-bold text-amber-100 focus:outline-none focus:border-amber-400">
+                    <button onclick="joinRoom()" class="w-full bg-amber-700 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                        <span>⚔️ Vào Phòng Đấu</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- WAITING ROOM SCREEN -->
+        <div id="waiting-screen" class="hidden w-full bg-amber-900/95 p-6 rounded-2xl shadow-2xl border border-amber-700 text-center space-y-4">
+            <h2 class="text-lg font-bold text-amber-200">Đang chờ đối thủ vào phòng...</h2>
+            <p class="text-xs text-amber-300">Gửi mã phòng này cho bạn bè của bạn:</p>
+            <div class="bg-amber-950 border border-amber-600 py-3 rounded-xl shadow-inner">
+                <span id="display-room-code" class="text-3xl font-mono font-bold tracking-widest text-emerald-400">------</span>
+            </div>
+            <button onclick="copyRoomCode()" class="text-xs bg-amber-800 hover:bg-amber-700 px-4 py-2 rounded-lg text-amber-200 transition shadow">📋 Sao chép mã phòng</button>
+            <div>
+                <button onclick="location.reload()" class="text-xs text-red-300 hover:underline mt-2">Hủy phòng</button>
+            </div>
+        </div>
+
+        <!-- GAME SCREEN -->
+        <div id="game-screen" class="hidden w-full flex flex-col items-center space-y-2">
+            <!-- Opponent Info -->
+            <div class="w-full flex justify-between items-center bg-amber-900/90 px-3 py-1.5 rounded-lg text-xs border border-amber-700 shadow">
+                <span id="opponent-name" class="font-bold text-amber-200">Đối thủ: Đang kết nối...</span>
+                <span id="turn-indicator" class="px-2.5 py-0.5 rounded bg-amber-950 text-amber-300 font-semibold">Lượt đi</span>
+            </div>
+
+            <!-- Board Container -->
+            <div class="xiangqi-board" id="board-container">
+                <!-- River Text (Sông) -->
+                <div class="absolute inset-x-0 top-[40%] h-[10%] flex justify-around items-center text-amber-900/40 font-bold text-xl tracking-[1em] pointer-events-none select-none" style="font-family: 'Noto Serif TC', serif;">
+                    <span>楚河</span><span>漢界</span>
+                </div>
+
+                <!-- Palace Lines Red (Cung Tướng Đỏ) -->
+                <div class="absolute left-[33.33%] bottom-0 w-[33.33%] h-[20%] pointer-events-none border-t border-amber-800/40" style="background: linear-gradient(to top right, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%), linear-gradient(to top left, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%);"></div>
+                
+                <!-- Palace Lines Black (Cung Tướng Đen) -->
+                <div class="absolute left-[33.33%] top-0 w-[33.33%] h-[20%] pointer-events-none border-b border-amber-800/40" style="background: linear-gradient(to bottom right, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%), linear-gradient(to bottom left, transparent 49%, #854d0e 49%, #854d0e 51%, transparent 51%);"></div>
+                
+                <!-- Pieces Layer -->
+                <div id="pieces-layer" class="absolute inset-0"></div>
+            </div>
+
+            <!-- Player Info & Controls -->
+            <div class="w-full flex justify-between items-center bg-amber-900/90 px-3 py-1.5 rounded-lg text-xs border border-amber-700 shadow">
+                <span id="my-name" class="font-bold text-amber-200">Bạn: Kỳ Thủ</span>
+                <div class="flex gap-2">
+                    <button onclick="surrender()" class="bg-red-900/80 hover:bg-red-800 text-red-200 px-3 py-1 rounded transition shadow">Đầu hàng</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER LOG -->
+    <footer class="w-full max-w-md text-center text-[10px] text-amber-400/60 py-1">
+        Cờ Tướng Online P2P Cloud (v2.1)
+    </footer>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        let peer = null;
+        let conn = null;
+        let myId = '';
+        let roomCode = '';
+        let isHost = false;
+        let myColor = 'red'; // 'red' or 'black'
+        let currentTurn = 'red';
+        let selectedPiece = null;
+        let myName = 'Kỳ Thủ';
+        let opponentName = 'Đối thủ';
+
+        // Initial standard board setup (10 rows x 9 cols)
+        let boardState = [
+            ['B_ROOK', 'B_HORSE', 'B_ELEPHANT', 'B_ADVISOR', 'B_GENERAL', 'B_ADVISOR', 'B_ELEPHANT', 'B_HORSE', 'B_ROOK'],
+            [null, null, null, null, null, null, null, null, null],
+            [null, 'B_CANNON', null, null, null, null, null, 'B_CANNON', null],
+            ['B_PAWN', null, 'B_PAWN', null, 'B_PAWN', null, 'B_PAWN', null, 'B_PAWN'],
+            [null, null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null],
+            ['R_PAWN', null, 'R_PAWN', null, 'R_PAWN', null, 'R_PAWN', null, 'R_PAWN'],
+            [null, 'R_CANNON', null, null, null, null, null, 'R_CANNON', null],
+            [null, null, null, null, null, null, null, null, null],
+            ['R_ROOK', 'R_HORSE', 'R_ELEPHANT', 'R_ADVISOR', 'R_GENERAL', 'R_ADVISOR', 'R_ELEPHANT', 'R_HORSE', 'R_ROOK']
+        ];
+
+        const pieceChinese = {
+            'R_GENERAL': '帥', 'R_ADVISOR': '仕', 'R_ELEPHANT': '相', 'R_HORSE': '馬', 'R_ROOK': '車', 'R_CANNON': '炮', 'R_PAWN': '兵',
+            'B_GENERAL': '將', 'B_ADVISOR': '士', 'B_ELEPHANT': '象', 'B_HORSE': '馬', 'B_ROOK': '車', 'B_CANNON': '砲', 'B_PAWN': '卒'
+        };
+
+        // Initialize PeerJS Cloud
+        function initPeer() {
+            peer = new Peer({
+                config: {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                }
+            });
+
+            peer.on('open', (id) => {
+                myId = id;
+                document.getElementById('status-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+                document.getElementById('status-text').innerText = 'Sẵn sàng kết nối Online (Cloud)';
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                document.getElementById('status-dot').className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+                document.getElementById('status-text').innerText = 'Lỗi kết nối Cloud';
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+        }
+
+        initPeer();
+
+        function generateRoomCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function createRoom() {
+            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ';
+            roomCode = generateRoomCode();
+            isHost = true;
+            myColor = 'red';
+
+            if (peer) peer.destroy();
+            
+            peer = new Peer('xiangqi_' + roomCode, {
+                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+            });
+
+            peer.on('open', () => {
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('waiting-screen').classList.remove('hidden');
+                document.getElementById('display-room-code').innerText = roomCode;
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+
+            peer.on('error', () => {
+                alert('Mã phòng đã tồn tại hoặc lỗi kết nối. Vui lòng thử lại!');
+            });
+        }
+
+        function joinRoom() {
+            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ';
+            let inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (inputCode.length !== 6) {
+                alert('Vui lòng nhập đúng mã phòng gồm 6 ký tự!');
+                return;
+            }
+            roomCode = inputCode;
+            isHost = false;
+            myColor = 'black';
+
+            conn = peer.connect('xiangqi_' + roomCode);
+            setupConnection();
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                conn.send({ type: 'JOIN', name: myName });
+            });
+
+            conn.on('data', (data) => {
+                handleNetworkData(data);
+            });
+        }
+
+        function handleNetworkData(data) {
+            if (data.type === 'JOIN') {
+                opponentName = data.name;
+                conn.send({ type: 'WELCOME', name: myName });
+                startGame();
+            } else if (data.type === 'WELCOME') {
+                opponentName = data.name;
+                startGame();
+            } else if (data.type === 'MOVE') {
+                boardState = data.boardState;
+                currentTurn = data.currentTurn;
+                renderBoard();
+                checkGameStatus();
+            } else if (data.type === 'SURRENDER') {
+                alert('Đối thủ đã đầu hàng! Bạn đã chiến thắng.');
+                location.reload();
+            }
+        }
+
+        function startGame() {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('waiting-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            document.getElementById('my-name').innerText = `Bạn (${myColor === 'red' ? 'Đỏ' : 'Đen'}): ${myName}`;
+            document.getElementById('opponent-name').innerText = `Đối thủ: ${opponentName}`;
+            renderBoard();
+        }
+
+        function copyRoomCode() {
+            navigator.clipboard.writeText(roomCode);
+            alert('Đã sao chép mã phòng: ' + roomCode);
+        }
+
+        function renderBoard() {
+            const layer = document.getElementById('pieces-layer');
+            layer.innerHTML = '';
+
+            let isFlipped = (myColor === 'black');
+
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    let piece = boardState[r][c];
+                    let renderR = isFlipped ? 9 - r : r;
+                    let renderC = isFlipped ? 8 - c : c;
+
+                    // Tọa độ phần trăm chuẩn khớp tâm các đường giao nhau trên bàn cờ
+                    let leftPos = renderC * 11.11 + 5.55;
+                    let topPos = renderR * 10 + 5;
+
+                    if (piece) {
+                        let div = document.createElement('div');
+                        let isRed = piece.startsWith('R');
+                        div.className = `absolute w-[9%] aspect-square rounded-full flex items-center justify-center font-bold text-base md:text-lg cursor-pointer piece -translate-x-1/2 -translate-y-1/2 ${
+                            isRed 
+                                ? 'bg-amber-100 text-red-700 border-2 border-red-600' 
+                                : 'bg-stone-900 text-amber-100 border-2 border-stone-600'
+                        } ${selectedPiece && selectedPiece.r === r && selectedPiece.c === c ? 'ring-4 ring-amber-400 scale-110 z-20' : 'z-10'}`;
+                        
+                        div.style.left = `${leftPos}%`;
+                        div.style.top = `${topPos}%`;
+                        div.style.fontFamily = "'Noto Serif TC', serif";
+                        div.innerText = pieceChinese[piece];
+
+                        div.onclick = (e) => {
+                            e.stopPropagation();
+                            handleCellClick(r, c);
+                        };
+
+                        layer.appendChild(div);
+                    } else {
+                        // Vùng bấm ô trống để đi quân
+                        let div = document.createElement('div');
+                        div.className = 'absolute w-[9%] aspect-square cursor-pointer -translate-x-1/2 -translate-y-1/2 z-0';
+                        div.style.left = `${leftPos}%`;
+                        div.style.top = `${topPos}%`;
+
+                        div.onclick = (e) => {
+                            e.stopPropagation();
+                            handleCellClick(r, c);
+                        };
+                        layer.appendChild(div);
+                    }
+                }
+            }
+
+            // Update turn indicator
+            let turnText = document.getElementById('turn-indicator');
+            if (currentTurn === myColor) {
+                turnText.innerText = 'Lượt của bạn';
+                turnText.className = 'px-2.5 py-0.5 rounded bg-emerald-700 text-white font-semibold shadow';
+            } else {
+                turnText.innerText = 'Lượt đối thủ';
+                turnText.className = 'px-2.5 py-0.5 rounded bg-amber-950 text-amber-300 font-semibold';
+            }
+        }
+
+        function handleCellClick(r, c) {
+            if (currentTurn !== myColor) return;
+
+            let piece = boardState[r][c];
+
+            if (piece && piece.startsWith(myColor === 'red' ? 'R' : 'B')) {
+                selectedPiece = { r, c, piece };
+                renderBoard();
+                return;
+            }
+
+            if (selectedPiece) {
+                let fromR = selectedPiece.r;
+                let fromC = selectedPiece.c;
+
+                // Di chuyển quân cờ
+                boardState[r][c] = selectedPiece.piece;
+                boardState[fromR][fromC] = null;
+
+                selectedPiece = null;
+                currentTurn = currentTurn === 'red' ? 'black' : 'red';
+
+                renderBoard();
+                checkGameStatus();
+
+                // Gửi dữ liệu qua mạng P2P Cloud
+                if (conn && conn.open) {
+                    conn.send({
+                        type: 'MOVE',
+                        boardState: boardState,
+                        currentTurn: currentTurn
+                    });
+                }
+            }
+        }
+
+        function checkGameStatus() {
+            let hasRedGeneral = false;
+            let hasBlackGeneral = false;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (boardState[r][c] === 'R_GENERAL') hasRedGeneral = true;
+                    if (boardState[r][c] === 'B_GENERAL') hasBlackGeneral = true;
+                }
+            }
+            if (!hasRedGeneral) {
+                alert('Quân Đỏ đã mất Tướng! Quân Đen thắng.');
+                location.reload();
+            } else if (!hasBlackGeneral) {
+                alert('Quân Đen đã mất Tướng! Quân Đỏ thắng.');
+                location.reload();
+            }
+        }
+
+        function surrender() {
+            if (confirm('Bạn có chắc chắn muốn đầu hàng?')) {
+                if (conn && conn.open) {
+                    conn.send({ type: 'SURRENDER' });
+                }
+                alert('Bạn đã đầu hàng.');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
