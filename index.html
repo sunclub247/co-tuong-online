@@ -151,8 +151,8 @@
                 <span id="nav-username" class="font-bold text-amber-200">Kỳ Thủ</span> (<span id="nav-elo" class="text-emerald-400 font-bold">1200</span>)
             </div>
             <div class="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-full text-[11px] border border-amber-800/60">
-                <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                <span id="status-text" class="text-amber-200 font-medium">Cloud...</span>
+                <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span id="status-text" class="text-amber-200 font-medium">Đang kết nối...</span>
             </div>
         </div>
     </header>
@@ -358,4 +358,617 @@
             <h3 id="end-title" class="text-xl font-bold text-amber-200">Chiến Thắng!</h3>
             <p id="end-desc" class="text-xs text-amber-300/90">Ván đấu đã kết thúc.</p>
             <div class="flex gap-2 pt-2">
-                <button onclick="resetMatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-
+                <button onclick="resetMatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs">Chơi ván mới</button>
+                <button onclick="location.reload()" class="flex-1 bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-2.5 rounded-xl text-xs">Thoát phòng</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Cấu hình Firebase của bạn
+        const firebaseConfig = {
+          apiKey: "AIzaSyCW3P94PqQ6UiorSOUYC3dqm-bXiYnxpAw",
+          authDomain: "co-tuong-online-567c5.firebaseapp.com",
+          projectId: "co-tuong-online-567c5",
+          storageBucket: "co-tuong-online-567c5.firebasestorage.app",
+          messagingSenderId: "153156318931",
+          appId: "1:153156318931:web:42afea112e8bdb94560626",
+          measurementId: "G-S3JS7YC263"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let userData = {
+            name: 'Kỳ Thủ',
+            elo: 1200,
+            wins: 0,
+            losses: 0,
+            draws: 0
+        };
+
+        // Đăng nhập / Đăng ký handlers
+        async function handleLogin() {
+            const email = document.getElementById('auth-email').value.trim();
+            const pass = document.getElementById('auth-password').value.trim();
+            if (!email || !pass) { alert('Vui lòng nhập đầy đủ email và mật khẩu!'); return; }
+            try {
+                const res = await auth.signInWithEmailAndPassword(email, pass);
+                await loadUserData(res.user.uid);
+                enterLobby();
+            } catch (err) { alert('Lỗi đăng nhập: ' + err.message); }
+        }
+
+        async function handleRegister() {
+            const email = document.getElementById('auth-email').value.trim();
+            const pass = document.getElementById('auth-password').value.trim();
+            if (!email || !pass) { alert('Vui lòng nhập đầy đủ email và mật khẩu!'); return; }
+            try {
+                const res = await auth.createUserWithEmailAndPassword(email, pass);
+                const defaultData = { name: email.split('@')[0], elo: 1200, wins: 0, losses: 0, draws: 0 };
+                await db.collection('users').doc(res.user.uid).set(defaultData);
+                userData = defaultData;
+                userData.uid = res.user.uid;
+                enterLobby();
+            } catch (err) { alert('Lỗi đăng ký: ' + err.message); }
+        }
+
+        function handleGuestLogin() {
+            userData = { name: 'Kỳ Thủ Khách_' + Math.floor(Math.random()*1000), elo: 1200, wins: 0, losses: 0, draws: 0, uid: 'guest_' + Math.random() };
+            enterLobby();
+        }
+
+        async function loadUserData(uid) {
+            const doc = await db.collection('users').doc(uid).get();
+            if (doc.exists) {
+                userData = doc.data();
+                userData.uid = uid;
+            } else {
+                userData = { name: 'Kỳ Thủ', elo: 1200, wins: 0, losses: 0, draws: 0, uid };
+                await db.collection('users').doc(uid).set(userData);
+            }
+        }
+
+        async function updateStatsOnCloud(result) {
+            if (!userData.uid || userData.uid.startsWith('guest_')) return;
+            if (result === 'win') { userData.wins++; userData.elo += 15; }
+            else if (result === 'loss') { userData.losses++; userData.elo = Math.max(100, userData.elo - 15); }
+            else if (result === 'draw') { userData.draws++; }
+
+            try {
+                await db.collection('users').doc(userData.uid).update({
+                    wins: userData.wins,
+                    losses: userData.losses,
+                    draws: userData.draws,
+                    elo: userData.elo
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        function enterLobby() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+            document.getElementById('user-info-badge').classList.remove('hidden');
+            document.getElementById('nav-username').innerText = userData.name;
+            document.getElementById('nav-elo').innerText = userData.elo;
+            document.getElementById('user-stats-desc').innerText = `Thắng: ${userData.wins} | Thua: ${userData.losses} | Hòa: ${userData.draws} (Elo: ${userData.elo})`;
+            myName = userData.name;
+        }
+
+        // --- CỜ TƯỚNG & HỆ THỐNG THỜI GIAN & PEERJS CLOUD ---
+        (function drawMarkers() {
+            const markersGroup = document.getElementById('board-markers');
+            const positions = [
+                {r: 2, c: 1}, {r: 2, c: 7}, {r: 7, c: 1}, {r: 7, c: 7},
+                {r: 3, c: 0}, {r: 3, c: 2}, {r: 3, c: 4}, {r: 3, c: 6}, {r: 3, c: 8},
+                {r: 6, c: 0}, {r: 6, c: 2}, {r: 6, c: 4}, {r: 6, c: 6}, {r: 6, c: 8}
+            ];
+
+            positions.forEach(pos => {
+                const cx = 70 + pos.c * 95;
+                const cy = 70 + pos.r * 95.555;
+                const g = 6, l = 14;
+                let d = '';
+                if (pos.c > 0) {
+                    d += `M ${cx - g - l} ${cy - g} L ${cx - g} ${cy - g} L ${cx - g} ${cy - g - l} `;
+                    d += `M ${cx - g - l} ${cy + g} L ${cx - g} ${cy + g} L ${cx - g} ${cy + g + l} `;
+                }
+                if (pos.c < 8) {
+                    d += `M ${cx + g + l} ${cy - g} L ${cx + g} ${cy - g} L ${cx + g} ${cy - g - l} `;
+                    d += `M ${cx + g + l} ${cy + g} L ${cx + g} ${cy + g} L ${cx + g} ${cy + g + l} `;
+                }
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', d);
+                markersGroup.appendChild(path);
+            });
+        })();
+
+        let configTotalTime = 300;
+        let configTurnTime = 30;
+        let redTotalLeft = 300;
+        let blackTotalLeft = 300;
+        let turnTimeLeft = 30;
+        let timerInterval = null;
+
+        function selectTimePreset(totalSec, turnSec, btnEl) {
+            configTotalTime = totalSec;
+            configTurnTime = turnSec;
+            document.querySelectorAll('.time-option-btn').forEach(b => {
+                b.classList.remove('active');
+                b.classList.add('text-amber-200');
+            });
+            btnEl.classList.add('active');
+            btnEl.classList.remove('text-amber-200');
+        }
+
+        function formatTimeMMSS(seconds) {
+            const s = Math.max(0, Math.floor(seconds));
+            return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+        }
+
+        let peer = null;
+        let conn = null;
+        let roomCode = '';
+        let myColor = 'red';
+        let currentTurn = 'red';
+        let selectedPiece = null;
+        let validMoves = [];
+        let lastMove = null;
+        let myName = 'Kỳ Thủ';
+        let opponentName = 'Đối thủ';
+        let gameOver = false;
+
+        const INITIAL_BOARD = [
+            ['B_ROOK', 'B_HORSE', 'B_ELEPHANT', 'B_ADVISOR', 'B_GENERAL', 'B_ADVISOR', 'B_ELEPHANT', 'B_HORSE', 'B_ROOK'],
+            [null, null, null, null, null, null, null, null, null],
+            [null, 'B_CANNON', null, null, null, null, null, 'B_CANNON', null],
+            ['B_PAWN', null, 'B_PAWN', null, 'B_PAWN', null, 'B_PAWN', null, 'B_PAWN'],
+            [null, null, null, null, null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null],
+            ['R_PAWN', null, 'R_PAWN', null, 'R_PAWN', null, 'R_PAWN', null, 'R_PAWN'],
+            [null, 'R_CANNON', null, null, null, null, null, 'R_CANNON', null],
+            [null, null, null, null, null, null, null, null, null],
+            ['R_ROOK', 'R_HORSE', 'R_ELEPHANT', 'R_ADVISOR', 'R_GENERAL', 'R_ADVISOR', 'R_ELEPHANT', 'R_HORSE', 'R_ROOK']
+        ];
+
+        let boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
+
+        const pieceChars = {
+            'R_GENERAL': '帥', 'R_ADVISOR': '仕', 'R_ELEPHANT': '相', 'R_HORSE': '馬', 'R_ROOK': '車', 'R_CANNON': '炮', 'R_PAWN': '兵',
+            'B_GENERAL': '將', 'B_ADVISOR': '士', 'B_ELEPHANT': '象', 'B_HORSE': '馬', 'B_ROOK': '車', 'B_CANNON': '砲', 'B_PAWN': '卒'
+        };
+
+        // Khởi tạo PeerJS Cloud với tùy chọn STUN server đảm bảo chuyển màu xanh lá ổn định
+        function initPeer(customId = null) {
+            if (peer) peer.destroy();
+            
+            const peerOptions = {
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            };
+
+            peer = customId ? new Peer(customId, peerOptions) : new Peer(peerOptions);
+
+            peer.on('open', () => {
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+                document.getElementById('status-text').innerText = 'Online (Cloud)';
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                if (err.type === 'unavailable-id') {
+                    alert('Mã phòng bị trùng, vui lòng bấm Tạo Phòng lại!');
+                } else {
+                    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+                    document.getElementById('status-text').innerText = 'Lỗi mạng Cloud';
+                }
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+        }
+
+        initPeer();
+
+        function createRoom() {
+            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            myColor = 'red';
+            initPeer('xiangqi_' + roomCode);
+            peer.on('open', () => {
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('waiting-screen').classList.remove('hidden');
+                document.getElementById('display-room-code').innerText = roomCode;
+                document.getElementById('waiting-time-info').innerText = `Chế độ: ${configTotalTime / 60} phút / ván • ${configTurnTime}s / lượt`;
+            });
+        }
+
+        function joinRoom() {
+            const inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (inputCode.length !== 6) { alert('Vui lòng nhập đúng 6 ký tự mã phòng!'); return; }
+            roomCode = inputCode;
+            myColor = 'black';
+            conn = peer.connect('xiangqi_' + roomCode, { reliable: true });
+            setupConnection();
+        }
+
+        function setupConnection() {
+            conn.on('open', () => { conn.send({ type: 'JOIN', name: myName }); });
+            conn.on('data', (data) => {
+                if (data.type === 'JOIN') {
+                    opponentName = data.name;
+                    conn.send({ type: 'WELCOME', name: myName, totalTime: configTotalTime, turnTime: configTurnTime });
+                    startGame();
+                } else if (data.type === 'WELCOME') {
+                    opponentName = data.name;
+                    configTotalTime = data.totalTime || 300;
+                    configTurnTime = data.turnTime || 30;
+                    startGame();
+                } else if (data.type === 'MOVE') {
+                    boardState = data.boardState;
+                    currentTurn = data.currentTurn;
+                    lastMove = data.lastMove;
+                    if (typeof data.redTotalLeft === 'number') redTotalLeft = data.redTotalLeft;
+                    if (typeof data.blackTotalLeft === 'number') blackTotalLeft = data.blackTotalLeft;
+                    turnTimeLeft = configTurnTime;
+                    selectedPiece = null;
+                    validMoves = [];
+                    updateClockDisplay();
+                    renderBoard();
+                    evaluateTurnState();
+                } else if (data.type === 'TIMEOUT') {
+                    if (data.loser === myColor) {
+                        showEndModal('⏰', 'Hết Giờ - Thua Cuộc!', data.reason);
+                        updateStatsOnCloud('loss');
+                    } else {
+                        showEndModal('🏆', 'Chiến Thắng!', data.reason);
+                        updateStatsOnCloud('win');
+                    }
+                } else if (data.type === 'SURRENDER') {
+                    showEndModal('🏆', 'Chiến Thắng!', 'Đối thủ đã xin đầu hàng.');
+                    updateStatsOnCloud('win');
+                } else if (data.type === 'DRAW_REQ') {
+                    if (confirm('Đối thủ muốn xin hòa. Bạn có đồng ý không?')) {
+                        conn.send({ type: 'DRAW_ACCEPT' });
+                        showEndModal('🤝', 'Hòa Cờ!', 'Hai kỳ thủ đã đồng ý hòa.');
+                        updateStatsOnCloud('draw');
+                    }
+                } else if (data.type === 'DRAW_ACCEPT') {
+                    showEndModal('🤝', 'Hòa Cờ!', 'Đối thủ đã đồng ý hòa.');
+                    updateStatsOnCloud('draw');
+                } else if (data.type === 'RESET') {
+                    resetBoardLocal();
+                }
+            });
+            conn.on('close', () => { stopTimer(); if (!gameOver) alert('Đối thủ đã ngắt kết nối!'); });
+        }
+
+        function startGame() {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('waiting-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('my-name').innerText = `${myName} (${myColor === 'red' ? 'Đỏ' : 'Đen'})`;
+            document.getElementById('opponent-name').innerText = `${opponentName} (${myColor === 'red' ? 'Đen' : 'Đỏ'})`;
+            resetBoardLocal();
+        }
+
+        function resetBoardLocal() {
+            boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
+            currentTurn = 'red';
+            selectedPiece = null;
+            validMoves = [];
+            lastMove = null;
+            gameOver = false;
+            redTotalLeft = configTotalTime;
+            blackTotalLeft = configTotalTime;
+            turnTimeLeft = configTurnTime;
+            document.getElementById('end-modal').classList.add('hidden');
+            document.getElementById('check-alert').classList.add('hidden');
+            updateClockDisplay();
+            renderBoard();
+            startTimer();
+        }
+
+        function startTimer() {
+            stopTimer();
+            timerInterval = setInterval(() => {
+                if (gameOver) { stopTimer(); return; }
+                if (currentTurn === 'red') redTotalLeft--; else blackTotalLeft--;
+                turnTimeLeft--;
+                updateClockDisplay();
+
+                if (currentTurn === myColor) {
+                    const myTotal = myColor === 'red' ? redTotalLeft : blackTotalLeft;
+                    if (myTotal <= 0) {
+                        const reason = 'Hết tổng thời gian.';
+                        if (conn && conn.open) conn.send({ type: 'TIMEOUT', loser: myColor, reason });
+                        showEndModal('⏰', 'Hết Giờ - Thua Cuộc!', reason);
+                        updateStatsOnCloud('loss');
+                    } else if (turnTimeLeft <= 0) {
+                        const reason = `Hết ${configTurnTime}s cho một lượt đi.`;
+                        if (conn && conn.open) conn.send({ type: 'TIMEOUT', loser: myColor, reason });
+                        showEndModal('⏳', 'Hết Giờ Lượt - Thua Cuộc!', reason);
+                        updateStatsOnCloud('loss');
+                    }
+                }
+            }, 1000);
+        }
+
+        function stopTimer() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+
+        function updateClockDisplay() {
+            const myTotal = myColor === 'red' ? redTotalLeft : blackTotalLeft;
+            const oppTotal = myColor === 'red' ? blackTotalLeft : redTotalLeft;
+            document.getElementById('my-total-clock').innerText = formatTimeMMSS(myTotal);
+            document.getElementById('opp-total-clock').innerText = formatTimeMMSS(oppTotal);
+
+            if (currentTurn === myColor) {
+                document.getElementById('my-turn-clock').innerText = `${Math.max(0, turnTimeLeft)}s`;
+                document.getElementById('opp-turn-clock').innerText = `${configTurnTime}s`;
+            } else {
+                document.getElementById('opp-turn-clock').innerText = `${Math.max(0, turnTimeLeft)}s`;
+                document.getElementById('my-turn-clock').innerText = `${configTurnTime}s`;
+            }
+        }
+
+        function resetMatch() { if (conn && conn.open) conn.send({ type: 'RESET' }); resetBoardLocal(); }
+        function copyRoomCode() { navigator.clipboard.writeText(roomCode); alert('Đã copy mã: ' + roomCode); }
+
+        function getCoordPercent(r, c) {
+            const isFlipped = (myColor === 'black');
+            return { left: 7.7778 + (isFlipped ? 8 - c : c) * 10.5556, top: 7.0 + (isFlipped ? 9 - r : r) * 9.5556 };
+        }
+
+        function renderBoard() {
+            const layer = document.getElementById('pieces-layer');
+            layer.innerHTML = '';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const pos = getCoordPercent(r, c);
+                    const piece = boardState[r][c];
+                    const isValidTarget = validMoves.some(m => m.r === r && m.c === c);
+
+                    if (piece) {
+                        const isRed = piece.startsWith('R');
+                        const isSelected = selectedPiece && selectedPiece.r === r && selectedPiece.c === c;
+                        const isLastMove = lastMove && ((lastMove.toR === r && lastMove.toC === c) || (lastMove.fromR === r && lastMove.fromC === c));
+
+                        const div = document.createElement('div');
+                        div.className = `xiangqi-piece piece-wood-base ${isRed ? 'piece-red' : 'piece-black'} ${isSelected ? 'piece-selected' : ''} ${isLastMove ? 'last-move-ring' : ''}`;
+                        div.style.left = `${pos.left}%`; div.style.top = `${pos.top}%`;
+                        div.style.fontSize = 'clamp(16px, 4.6vw, 22px)';
+                        div.style.zIndex = isSelected ? '30' : '15';
+                        div.innerText = pieceChars[piece];
+                        div.onclick = (e) => { e.stopPropagation(); handleCellClick(r, c); };
+                        layer.appendChild(div);
+
+                        if (isValidTarget) {
+                            const ring = document.createElement('div');
+                            ring.className = 'valid-capture-ring';
+                            ring.style.left = `${pos.left}%`; ring.style.top = `${pos.top}%`;
+                            layer.appendChild(ring);
+                        }
+                    } else {
+                        const hitArea = document.createElement('div');
+                        hitArea.className = 'absolute w-[9.5%] aspect-square -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10';
+                        hitArea.style.left = `${pos.left}%`; hitArea.style.top = `${pos.top}%`;
+                        hitArea.onclick = (e) => { e.stopPropagation(); handleCellClick(r, c); };
+                        layer.appendChild(hitArea);
+
+                        if (isValidTarget) {
+                            const dot = document.createElement('div');
+                            dot.className = 'valid-dot';
+                            dot.style.left = `${pos.left}%`; dot.style.top = `${pos.top}%`;
+                            layer.appendChild(dot);
+                        }
+                    }
+                }
+            }
+            document.getElementById('turn-indicator').innerText = currentTurn === myColor ? 'Lượt bạn' : 'Lượt đối thủ';
+        }
+
+        function handleCellClick(r, c) {
+            if (gameOver || currentTurn !== myColor) return;
+            const clickedPiece = boardState[r][c];
+            const myPrefix = myColor === 'red' ? 'R_' : 'B_';
+
+            if (clickedPiece && clickedPiece.startsWith(myPrefix)) {
+                selectedPiece = { r, c, piece: clickedPiece };
+                validMoves = getLegalMoves(boardState, r, c);
+                renderBoard();
+                return;
+            }
+
+            if (selectedPiece) {
+                if (!validMoves.some(m => m.r === r && m.c === c)) return;
+                const fromR = selectedPiece.r, fromC = selectedPiece.c;
+                boardState[r][c] = selectedPiece.piece;
+                boardState[fromR][fromC] = null;
+                lastMove = { fromR, fromC, toR: r, toC: c };
+                selectedPiece = null;
+                validMoves = [];
+                currentTurn = currentTurn === 'red' ? 'black' : 'red';
+                turnTimeLeft = configTurnTime;
+
+                updateClockDisplay();
+                renderBoard();
+                evaluateTurnState();
+
+                if (conn && conn.open) {
+                    conn.send({ type: 'MOVE', boardState, currentTurn, lastMove, redTotalLeft, blackTotalLeft });
+                }
+            }
+        }
+
+        // --- LUẬT CỜ ---
+        function getPseudoMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const isRed = piece.startsWith('R_');
+            const type = piece.split('_')[1];
+            const moves = [];
+            const isEnemyOrEmpty = (tr, tc) => {
+                if (tr < 0 || tr > 9 || tc < 0 || tc > 8) return false;
+                const target = board[tr][tc];
+                return !target || (isRed ? target.startsWith('B_') : target.startsWith('R_'));
+            };
+
+            if (type === 'ROOK') {
+                [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+                    let nr = r + dr, nc = c + dc;
+                    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+                        if (!board[nr][nc]) moves.push({r: nr, c: nc});
+                        else { if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc}); break; }
+                        nr += dr; nc += dc;
+                    }
+                });
+            } else if (type === 'CANNON') {
+                [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+                    let nr = r + dr, nc = c + dc, jumped = false;
+                    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+                        if (!jumped) { if (!board[nr][nc]) moves.push({r: nr, c: nc}); else jumped = true; }
+                        else { if (board[nr][nc]) { if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc}); break; } }
+                        nr += dr; nc += dc;
+                    }
+                });
+            } else if (type === 'HORSE') {
+                [
+                    {dr: -2, dc: -1, lr: -1, lc: 0}, {dr: -2, dc: 1, lr: -1, lc: 0},
+                    {dr: 2, dc: -1, lr: 1, lc: 0},   {dr: 2, dc: 1, lr: 1, lc: 0},
+                    {dr: -1, dc: -2, lr: 0, lc: -1}, {dr: 1, dc: -2, lr: 0, lc: -1},
+                    {dr: -1, dc: 2, lr: 0, lc: 1},   {dr: 1, dc: 2, lr: 0, lc: 1}
+                ].forEach(j => {
+                    if (r + j.dr >= 0 && r + j.dr <= 9 && c + j.dc >= 0 && c + j.dc <= 8 && !board[r + j.lr][c + j.lc]) {
+                        if (isEnemyOrEmpty(r + j.dr, c + j.dc)) moves.push({r: r + j.dr, c: c + j.dc});
+                    }
+                });
+            } else if (type === 'ELEPHANT') {
+                [
+                    {dr: -2, dc: -2, er: -1, ec: -1}, {dr: -2, dc: 2, er: -1, ec: 1},
+                    {dr: 2, dc: -2, er: 1, ec: -1},   {dr: 2, dc: 2, er: 1, ec: 1}
+                ].forEach(s => {
+                    const nr = r + s.dr, nc = c + s.dc;
+                    const inOwn = isRed ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4);
+                    if (inOwn && nc >= 0 && nc <= 8 && !board[r + s.er][c + s.ec] && isEnemyOrEmpty(nr, nc)) {
+                        moves.push({r: nr, c: nc});
+                    }
+                });
+            } else if (type === 'ADVISOR' || type === 'GENERAL') {
+                [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+                    const nr = r + dr, nc = c + dc;
+                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
+                    if (type === 'ADVISOR') {
+                        const diag = [[-1,-1],[-1,1],[1,-1],[1,1]].some(d => d[0] === dr && d[1] === dc);
+                        if (!diag) return;
+                    }
+                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
+                });
+            } else if (type === 'PAWN') {
+                const forward = isRed ? -1 : 1;
+                if (isEnemyOrEmpty(r + forward, c)) moves.push({r: r + forward, c});
+                if (isRed ? r <= 4 : r >= 5) {
+                    if (isEnemyOrEmpty(r, c - 1)) moves.push({r, c: c - 1});
+                    if (isEnemyOrEmpty(r, c + 1)) moves.push({r, c: c + 1});
+                }
+            }
+            return moves;
+        }
+
+        function isKingInCheck(board, color) {
+            const kingName = color === 'red' ? 'R_GENERAL' : 'B_GENERAL';
+            const oppKing = color === 'red' ? 'B_GENERAL' : 'R_GENERAL';
+            let kr = -1, kc = -1, okr = -1, okc = -1;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] === kingName) { kr = r; kc = c; }
+                    if (board[r][c] === oppKing) { okr = r; okc = c; }
+                }
+            }
+            if (kr === -1) return true;
+            if (kc === okc && okr !== -1) {
+                let blocked = false;
+                for (let i = Math.min(kr, okr) + 1; i < Math.max(kr, okr); i++) {
+                    if (board[i][kc]) { blocked = true; break; }
+                }
+                if (!blocked) return true;
+            }
+            const oppPrefix = color === 'red' ? 'B_' : 'R_';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] && board[r][c].startsWith(oppPrefix)) {
+                        if (getPseudoMoves(board, r, c).some(m => m.r === kr && m.c === kc)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function getLegalMoves(board, r, c) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const color = piece.startsWith('R_') ? 'red' : 'black';
+            return getPseudoMoves(board, r, c).filter(m => {
+                const copy = board.map(row => [...row]);
+                copy[m.r][m.c] = copy[r][c];
+                copy[r][c] = null;
+                return !isKingInCheck(copy, color);
+            });
+        }
+
+        function evaluateTurnState() {
+            if (isKingInCheck(boardState, currentTurn)) document.getElementById('check-alert').classList.remove('hidden');
+            else document.getElementById('check-alert').classList.add('hidden');
+
+            const prefix = currentTurn === 'red' ? 'R_' : 'B_';
+            let hasAny = false;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (boardState[r][c] && boardState[r][c].startsWith(prefix)) {
+                        if (getLegalMoves(boardState, r, c).length > 0) { hasAny = true; break; }
+                    }
+                }
+                if (hasAny) break;
+            }
+
+            if (!hasAny) {
+                const winner = currentTurn === 'red' ? 'black' : 'red';
+                if (winner === myColor) {
+                    showEndModal('🏆', 'Chiếu Bí - Thắng!', 'Đối thủ hết nước đi.');
+                    updateStatsOnCloud('win');
+                } else {
+                    showEndModal('🏳️', 'Thua Cuộc!', 'Bạn đã bị chiếu bí.');
+                    updateStatsOnCloud('loss');
+                }
+            }
+        }
+
+        function showEndModal(icon, title, desc) {
+            gameOver = true;
+            stopTimer();
+            document.getElementById('end-icon').innerText = icon;
+            document.getElementById('end-title').innerText = title;
+            document.getElementById('end-desc').innerText = desc;
+            document.getElementById('end-modal').classList.remove('hidden');
+        }
+
+        function surrender() {
+            if (confirm('Bạn có chắc muốn đầu hàng?')) {
+                if (conn && conn.open) conn.send({ type: 'SURRENDER' });
+                showEndModal('🏳️', 'Đã Đầu Hàng', 'Bạn đã thua trận này.');
+                updateStatsOnCloud('loss');
+            }
+        }
+
+        function requestDraw() {
+            if (conn && conn.open) { conn.send({ type: 'DRAW_REQ' }); alert('Đã gửi yêu cầu hòa.'); }
+        }
+    </script>
+</body>
+</html>
