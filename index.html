@@ -126,6 +126,17 @@
             from { transform: translate(-50%, -50%) rotate(0deg); }
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
+
+        /* Nút chọn thời gian */
+        .time-option-btn {
+            transition: all 0.15s ease;
+        }
+        .time-option-btn.active {
+            background-color: rgba(16, 185, 129, 0.25);
+            border-color: #10b981;
+            color: #6ee7b7;
+            box-shadow: 0 0 0 1px #10b981;
+        }
     </style>
 </head>
 <body class="text-amber-100 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none">
@@ -149,13 +160,32 @@
         <div id="lobby-screen" class="w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
             <div class="text-center space-y-1">
                 <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Kỳ Đài Trực Tuyến</h2>
-                <p class="text-xs text-amber-400/80">Tạo phòng và chia sẻ mã 6 ký tự cho bạn bè cùng chơi</p>
+                <p class="text-xs text-amber-400/80">Chọn thời gian thi đấu, tạo phòng và gửi mã 6 ký tự cho bạn bè</p>
             </div>
 
             <div class="space-y-3 pt-1">
                 <div>
                     <label class="block text-xs font-medium text-amber-300 mb-1">Tên kỳ thủ của bạn:</label>
                     <input type="text" id="player-name" value="Kỳ Thủ" maxlength="16" class="w-full bg-black/40 border border-amber-700 rounded-xl px-3.5 py-2.5 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
+                </div>
+
+                <!-- CHỌN THỜI GIAN VÁN ĐẤU -->
+                <div>
+                    <label class="block text-xs font-medium text-amber-300 mb-1.5">⏱️ Chế độ thời gian (Ván mới):</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" onclick="selectTimePreset(300, 30, this)" class="time-option-btn active bg-black/40 border border-amber-700 rounded-xl p-2 text-center">
+                            <div class="text-sm font-bold">5 Phút</div>
+                            <div class="text-[10px] opacity-80">30s / lượt</div>
+                        </button>
+                        <button type="button" onclick="selectTimePreset(600, 60, this)" class="time-option-btn bg-black/40 border border-amber-700 rounded-xl p-2 text-center text-amber-200">
+                            <div class="text-sm font-bold">10 Phút</div>
+                            <div class="text-[10px] opacity-80">60s / lượt</div>
+                        </button>
+                        <button type="button" onclick="selectTimePreset(900, 180, this)" class="time-option-btn bg-black/40 border border-amber-700 rounded-xl p-2 text-center text-amber-200">
+                            <div class="text-sm font-bold">15 Phút</div>
+                            <div class="text-[10px] opacity-80">180s / lượt</div>
+                        </button>
+                    </div>
                 </div>
 
                 <button onclick="createRoom()" class="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-[0.98] flex items-center justify-center gap-2">
@@ -181,6 +211,7 @@
         <div id="waiting-screen" class="hidden w-full bg-amber-950/90 p-6 rounded-2xl shadow-2xl border border-amber-800 text-center space-y-4">
             <div class="inline-block p-3 rounded-full bg-amber-900/60 border border-amber-700 text-2xl animate-bounce">⏳</div>
             <h2 class="text-lg font-bold text-amber-200">Đang chờ đối thủ vào bàn...</h2>
+            <p id="waiting-time-info" class="text-xs text-emerald-300 font-medium">Chế độ: 5 phút / ván • 30 giây / lượt</p>
             <p class="text-xs text-amber-300/80">Gửi mã phòng dưới đây cho người chơi thứ 2:</p>
             <div class="bg-black/50 border border-amber-600/80 py-3.5 rounded-xl shadow-inner">
                 <span id="display-room-code" class="text-3xl font-mono font-black tracking-[0.25em] text-emerald-400">------</span>
@@ -194,31 +225,33 @@
         <!-- MÀN HÌNH BÀN CỜ -->
         <div id="game-screen" class="hidden w-full flex flex-col items-center gap-2">
             
-            <!-- Thanh thông tin đối thủ (Phía trên) -->
+            <!-- Thanh thông tin & Đồng hồ ĐỐI THỦ (Phía trên) -->
             <div class="w-full flex justify-between items-center bg-amber-950/90 px-3 py-2 rounded-xl text-xs border border-amber-800/80 shadow">
                 <div class="flex items-center gap-2">
                     <span id="opp-badge" class="w-3 h-3 rounded-full bg-stone-900 border border-amber-400"></span>
-                    <span id="opponent-name" class="font-bold text-amber-200">Đối thủ</span>
+                    <span id="opponent-name" class="font-bold text-amber-200 truncate max-w-[110px]">Đối thủ</span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span id="check-alert" class="hidden px-2 py-0.5 rounded bg-red-600 text-white font-bold animate-pulse">CHIẾU TƯỚNG!</span>
-                    <span id="turn-indicator" class="px-2.5 py-1 rounded-lg bg-amber-900 text-amber-200 font-bold">Đang chờ</span>
+
+                <!-- Đồng hồ đối thủ -->
+                <div class="flex items-center gap-1.5 font-mono">
+                    <span id="opp-total-clock" class="px-2 py-0.5 rounded bg-black/60 border border-amber-700/70 text-amber-100 font-bold text-xs">05:00</span>
+                    <span id="opp-turn-clock" class="px-1.5 py-0.5 rounded bg-amber-900/80 border border-amber-700/50 text-amber-300 text-[11px]">30s</span>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <span id="check-alert" class="hidden px-1.5 py-0.5 rounded bg-red-600 text-white font-bold text-[10px] animate-pulse">CHIẾU!</span>
+                    <span id="turn-indicator" class="px-2 py-0.5 rounded-lg bg-amber-900 text-amber-200 font-bold text-[11px]">Đang chờ</span>
                 </div>
             </div>
 
             <!-- BÀN CỜ TƯỚNG CHUẨN TỌA ĐỘ + VIỀN RỘNG -->
             <div class="board-frame" id="board-frame">
-                <!-- SVG vẽ đường kẻ bàn cờ có padding chuẩn:
-                     ViewBox 900 x 1000.
-                     Lề trái/phải = 70 (cách nhau 95 cho 8 khoảng -> 70 + 8*95 = 830, lề phải còn 70)
-                     Lề trên/dưới = 70 (cách nhau 95.55 cho 9 khoảng -> 70 + 9*95.55 = 930, lề dưới còn 70)
-                -->
                 <svg viewBox="0 0 900 1000" class="w-full h-full block pointer-events-none">
                     <!-- Viền khung đôi trang trí ngoài lưới cờ -->
                     <rect x="56" y="56" width="788" height="888" fill="none" stroke="#5c2c0c" stroke-width="5"/>
                     <rect x="70" y="70" width="760" height="860" fill="none" stroke="#5c2c0c" stroke-width="2.5"/>
 
-                    <!-- 10 Đường ngang (y = 70 + r * 95.555) -->
+                    <!-- 10 Đường ngang -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="70" y1="70" x2="830" y2="70"/>
                         <line x1="70" y1="165.56" x2="830" y2="165.56"/>
@@ -232,9 +265,8 @@
                         <line x1="70" y1="930" x2="830" y2="930"/>
                     </g>
 
-                    <!-- 9 Đường dọc (x = 70 + c * 95) - Ngắt quãng ở sông giữa hàng 4 và hàng 5 -->
+                    <!-- 9 Đường dọc - Ngắt quãng ở sông -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
-                        <!-- Nửa trên (Hàng 0 đến Hàng 4) -->
                         <line x1="165" y1="70" x2="165" y2="452.22"/>
                         <line x1="260" y1="70" x2="260" y2="452.22"/>
                         <line x1="355" y1="70" x2="355" y2="452.22"/>
@@ -243,7 +275,6 @@
                         <line x1="640" y1="70" x2="640" y2="452.22"/>
                         <line x1="735" y1="70" x2="735" y2="452.22"/>
 
-                        <!-- Nửa dưới (Hàng 5 đến Hàng 9) -->
                         <line x1="165" y1="547.78" x2="165" y2="930"/>
                         <line x1="260" y1="547.78" x2="260" y2="930"/>
                         <line x1="355" y1="547.78" x2="355" y2="930"/>
@@ -253,19 +284,19 @@
                         <line x1="735" y1="547.78" x2="735" y2="930"/>
                     </g>
 
-                    <!-- Đường chéo Cung Tướng Trên (cột 3-5, hàng 0-2) -->
+                    <!-- Đường chéo Cung Tướng Trên -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="355" y1="70" x2="545" y2="261.11"/>
                         <line x1="545" y1="70" x2="355" y2="261.11"/>
                     </g>
 
-                    <!-- Đường chéo Cung Tướng Dưới (cột 3-5, hàng 7-9) -->
+                    <!-- Đường chéo Cung Tướng Dưới -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="355" y1="738.89" x2="545" y2="930"/>
                         <line x1="545" y1="738.89" x2="355" y2="930"/>
                     </g>
 
-                    <!-- Chữ Sở Hà - Hán Giới ở giữa sông -->
+                    <!-- Chữ Sở Hà - Hán Giới -->
                     <text x="260" y="514" fill="#5c2c0c" fill-opacity="0.7" font-size="42" font-family="'Noto Serif TC', serif" font-weight="bold" text-anchor="middle" letter-spacing="14">楚河</text>
                     <text x="640" y="514" fill="#5c2c0c" fill-opacity="0.7" font-size="42" font-family="'Noto Serif TC', serif" font-weight="bold" text-anchor="middle" letter-spacing="14">漢界</text>
 
@@ -277,15 +308,22 @@
                 <div id="pieces-layer" class="absolute inset-0"></div>
             </div>
 
-            <!-- Thanh thông tin bản thân & nút chức năng (Phía dưới) -->
+            <!-- Thanh thông tin & Đồng hồ BẢN THÂN + Nút chức năng (Phía dưới) -->
             <div class="w-full flex justify-between items-center bg-amber-950/90 px-3 py-2 rounded-xl text-xs border border-amber-800/80 shadow">
                 <div class="flex items-center gap-2">
                     <span id="my-badge" class="w-3 h-3 rounded-full bg-red-600 border border-amber-300"></span>
-                    <span id="my-name" class="font-bold text-amber-200">Bạn</span>
+                    <span id="my-name" class="font-bold text-amber-200 truncate max-w-[100px]">Bạn</span>
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="requestDraw()" class="bg-amber-800 hover:bg-amber-700 text-amber-100 px-3 py-1 rounded-lg transition">Xin hòa</button>
-                    <button onclick="surrender()" class="bg-red-900/90 hover:bg-red-800 text-red-100 px-3 py-1 rounded-lg transition">Đầu hàng</button>
+
+                <!-- Đồng hồ bản thân -->
+                <div class="flex items-center gap-1.5 font-mono">
+                    <span id="my-total-clock" class="px-2 py-0.5 rounded bg-black/60 border border-amber-700/70 text-amber-100 font-bold text-xs">05:00</span>
+                    <span id="my-turn-clock" class="px-1.5 py-0.5 rounded bg-amber-900/80 border border-amber-700/50 text-amber-300 text-[11px]">30s</span>
+                </div>
+
+                <div class="flex gap-1.5">
+                    <button onclick="requestDraw()" class="bg-amber-800 hover:bg-amber-700 text-amber-100 px-2.5 py-1 rounded-lg transition text-[11px]">Xin hòa</button>
+                    <button onclick="surrender()" class="bg-red-900/90 hover:bg-red-800 text-red-100 px-2.5 py-1 rounded-lg transition text-[11px]">Đầu hàng</button>
                 </div>
             </div>
         </div>
@@ -309,10 +347,8 @@
         (function drawMarkers() {
             const markersGroup = document.getElementById('board-markers');
             const positions = [
-                // Vị trí Pháo
                 {r: 2, c: 1}, {r: 2, c: 7},
                 {r: 7, c: 1}, {r: 7, c: 7},
-                // Vị trí Tốt
                 {r: 3, c: 0}, {r: 3, c: 2}, {r: 3, c: 4}, {r: 3, c: 6}, {r: 3, c: 8},
                 {r: 6, c: 0}, {r: 6, c: 2}, {r: 6, c: 4}, {r: 6, c: 6}, {r: 6, c: 8}
             ];
@@ -320,17 +356,15 @@
             positions.forEach(pos => {
                 const cx = 70 + pos.c * 95;
                 const cy = 70 + pos.r * 95.555;
-                const g = 6;  // khoảng cách từ tâm
-                const l = 14; // chiều dài nét góc
+                const g = 6;
+                const l = 14;
 
                 let d = '';
                 if (pos.c > 0) {
-                    // Góc trên trái & dưới trái
                     d += `M ${cx - g - l} ${cy - g} L ${cx - g} ${cy - g} L ${cx - g} ${cy - g - l} `;
                     d += `M ${cx - g - l} ${cy + g} L ${cx - g} ${cy + g} L ${cx - g} ${cy + g + l} `;
                 }
                 if (pos.c < 8) {
-                    // Góc trên phải & dưới phải
                     d += `M ${cx + g + l} ${cy - g} L ${cx + g} ${cy - g} L ${cx + g} ${cy - g - l} `;
                     d += `M ${cx + g + l} ${cy + g} L ${cx + g} ${cy + g} L ${cx + g} ${cy + g + l} `;
                 }
@@ -339,6 +373,32 @@
                 markersGroup.appendChild(path);
             });
         })();
+
+        // Biến cấu hình thời gian (Mặc định 5 phút = 300s, mỗi lượt = 30s)
+        let configTotalTime = 300;
+        let configTurnTime = 30;
+        let redTotalLeft = 300;
+        let blackTotalLeft = 300;
+        let turnTimeLeft = 30;
+        let timerInterval = null;
+
+        function selectTimePreset(totalSec, turnSec, btnEl) {
+            configTotalTime = totalSec;
+            configTurnTime = turnSec;
+            document.querySelectorAll('.time-option-btn').forEach(b => {
+                b.classList.remove('active');
+                b.classList.add('text-amber-200');
+            });
+            btnEl.classList.add('active');
+            btnEl.classList.remove('text-amber-200');
+        }
+
+        function formatTimeMMSS(seconds) {
+            const s = Math.max(0, Math.floor(seconds));
+            const mins = Math.floor(s / 60);
+            const secs = s % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
 
         // Biến trạng thái mạng & trò chơi
         let peer = null;
@@ -421,6 +481,8 @@
                 document.getElementById('lobby-screen').classList.add('hidden');
                 document.getElementById('waiting-screen').classList.remove('hidden');
                 document.getElementById('display-room-code').innerText = roomCode;
+                document.getElementById('waiting-time-info').innerText = 
+                    `Chế độ: ${configTotalTime / 60} phút / ván • ${configTurnTime} giây / lượt`;
             });
         }
 
@@ -446,19 +508,41 @@
             conn.on('data', (data) => {
                 if (data.type === 'JOIN') {
                     opponentName = data.name;
-                    conn.send({ type: 'WELCOME', name: myName });
+                    // Chủ phòng gửi cấu hình thời gian cho khách đồng bộ
+                    conn.send({ 
+                        type: 'WELCOME', 
+                        name: myName,
+                        totalTime: configTotalTime,
+                        turnTime: configTurnTime
+                    });
                     startGame();
                 } else if (data.type === 'WELCOME') {
                     opponentName = data.name;
+                    configTotalTime = data.totalTime || 300;
+                    configTurnTime = data.turnTime || 30;
                     startGame();
                 } else if (data.type === 'MOVE') {
                     boardState = data.boardState;
                     currentTurn = data.currentTurn;
                     lastMove = data.lastMove;
+                    // Đồng bộ thời gian tổng từ máy vừa đi và reset thời gian lượt mới
+                    if (typeof data.redTotalLeft === 'number') redTotalLeft = data.redTotalLeft;
+                    if (typeof data.blackTotalLeft === 'number') blackTotalLeft = data.blackTotalLeft;
+                    turnTimeLeft = configTurnTime;
+
                     selectedPiece = null;
                     validMoves = [];
+                    updateClockDisplay();
                     renderBoard();
                     evaluateTurnState();
+                } else if (data.type === 'TIMEOUT') {
+                    // Nhận thông báo hết giờ từ máy đang giữ lượt
+                    const loserColor = data.loser;
+                    if (loserColor === myColor) {
+                        showEndModal('⏰', 'Hết Giờ - Thua Cuộc!', data.reason || 'Bạn đã hết thời gian quy định.');
+                    } else {
+                        showEndModal('🏆', 'Chiến Thắng!', data.reason || 'Đối thủ đã hết thời gian quy định.');
+                    }
                 } else if (data.type === 'SURRENDER') {
                     showEndModal('🏆', 'Chiến Thắng!', 'Đối thủ đã xin đầu hàng.');
                 } else if (data.type === 'DRAW_REQ') {
@@ -474,6 +558,7 @@
             });
 
             conn.on('close', () => {
+                stopTimer();
                 if (!gameOver) {
                     alert('Đối thủ đã ngắt kết nối khỏi phòng!');
                 }
@@ -505,9 +590,104 @@
             validMoves = [];
             lastMove = null;
             gameOver = false;
+
+            // Đặt lại đồng hồ về ban đầu
+            redTotalLeft = configTotalTime;
+            blackTotalLeft = configTotalTime;
+            turnTimeLeft = configTurnTime;
+
             document.getElementById('end-modal').classList.add('hidden');
             document.getElementById('check-alert').classList.add('hidden');
+            updateClockDisplay();
             renderBoard();
+            startTimer();
+        }
+
+        // --- HỆ THỐNG ĐỒNG HỒ ĐẾM NGƯỢC ---
+        function startTimer() {
+            stopTimer();
+            timerInterval = setInterval(() => {
+                if (gameOver) {
+                    stopTimer();
+                    return;
+                }
+
+                // Trừ 1 giây cho bên đang tới lượt
+                if (currentTurn === 'red') {
+                    redTotalLeft--;
+                } else {
+                    blackTotalLeft--;
+                }
+                turnTimeLeft--;
+
+                updateClockDisplay();
+
+                // Chỉ máy của người đang giữ lượt kiểm tra và phát tín hiệu xử thua khi hết giờ
+                if (currentTurn === myColor) {
+                    const myTotal = myColor === 'red' ? redTotalLeft : blackTotalLeft;
+                    if (myTotal <= 0) {
+                        const reason = 'Đã hết tổng thời gian của ván đấu.';
+                        if (conn && conn.open) conn.send({ type: 'TIMEOUT', loser: myColor, reason });
+                        showEndModal('⏰', 'Hết Giờ Tổng - Thua Cuộc!', reason);
+                    } else if (turnTimeLeft <= 0) {
+                        const reason = `Đã hết ${configTurnTime} giây cho một lượt đi.`;
+                        if (conn && conn.open) conn.send({ type: 'TIMEOUT', loser: myColor, reason });
+                        showEndModal('⏳', 'Hết Giờ Lượt Đi - Thua Cuộc!', reason);
+                    }
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function updateClockDisplay() {
+            const myTotal = myColor === 'red' ? redTotalLeft : blackTotalLeft;
+            const oppTotal = myColor === 'red' ? blackTotalLeft : redTotalLeft;
+
+            const myTotalEl = document.getElementById('my-total-clock');
+            const myTurnEl = document.getElementById('my-turn-clock');
+            const oppTotalEl = document.getElementById('opp-total-clock');
+            const oppTurnEl = document.getElementById('opp-turn-clock');
+
+            myTotalEl.innerText = formatTimeMMSS(myTotal);
+            oppTotalEl.innerText = formatTimeMMSS(oppTotal);
+
+            if (currentTurn === myColor) {
+                // Đang là lượt của mình
+                myTurnEl.innerText = `${Math.max(0, turnTimeLeft)}s`;
+                oppTurnEl.innerText = `${configTurnTime}s`;
+
+                myTotalEl.className = myTotal <= 30
+                    ? 'px-2 py-0.5 rounded bg-red-900 border border-red-500 text-white font-bold text-xs animate-pulse'
+                    : 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500 text-emerald-300 font-bold text-xs';
+
+                myTurnEl.className = turnTimeLeft <= 10
+                    ? 'px-1.5 py-0.5 rounded bg-red-600 text-white font-bold text-[11px] animate-pulse'
+                    : 'px-1.5 py-0.5 rounded bg-emerald-700 text-white font-bold text-[11px]';
+
+                oppTotalEl.className = 'px-2 py-0.5 rounded bg-black/60 border border-amber-800/60 text-amber-200/70 font-bold text-xs';
+                oppTurnEl.className = 'px-1.5 py-0.5 rounded bg-black/40 border border-amber-800/40 text-amber-300/60 text-[11px]';
+            } else {
+                // Đang là lượt của đối thủ
+                oppTurnEl.innerText = `${Math.max(0, turnTimeLeft)}s`;
+                myTurnEl.innerText = `${configTurnTime}s`;
+
+                oppTotalEl.className = oppTotal <= 30
+                    ? 'px-2 py-0.5 rounded bg-red-900 border border-red-500 text-white font-bold text-xs animate-pulse'
+                    : 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500 text-emerald-300 font-bold text-xs';
+
+                oppTurnEl.className = turnTimeLeft <= 10
+                    ? 'px-1.5 py-0.5 rounded bg-red-600 text-white font-bold text-[11px] animate-pulse'
+                    : 'px-1.5 py-0.5 rounded bg-emerald-700 text-white font-bold text-[11px]';
+
+                myTotalEl.className = 'px-2 py-0.5 rounded bg-black/60 border border-amber-800/60 text-amber-200/70 font-bold text-xs';
+                myTurnEl.className = 'px-1.5 py-0.5 rounded bg-black/40 border border-amber-800/40 text-amber-300/60 text-[11px]';
+            }
         }
 
         function resetMatch() {
@@ -520,7 +700,6 @@
             alert('Đã sao chép mã phòng: ' + roomCode);
         }
 
-        // Quy đổi tọa độ hàng/cột sang phần trăm khớp 100% với SVG (lề 70/900 = 7.7778%, bước cột 95/900 = 10.5556%; lề trên 70/1000 = 7%, bước hàng 95.555/1000 = 9.5556%)
         function getCoordPercent(r, c) {
             const isFlipped = (myColor === 'black');
             const renderR = isFlipped ? 9 - r : r;
@@ -535,7 +714,6 @@
             const layer = document.getElementById('pieces-layer');
             layer.innerHTML = '';
 
-            // Vẽ tất cả 90 giao điểm tương tác & quân cờ
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 9; c++) {
                     const pos = getCoordPercent(r, c);
@@ -561,7 +739,6 @@
                         };
                         layer.appendChild(div);
 
-                        // Vòng tròn đỏ nhấp nháy nếu quân đối phương nằm trong tầm ăn
                         if (isValidTarget) {
                             const ring = document.createElement('div');
                             ring.className = 'valid-capture-ring';
@@ -570,7 +747,6 @@
                             layer.appendChild(ring);
                         }
                     } else {
-                        // Vùng chạm giao điểm trống
                         const hitArea = document.createElement('div');
                         hitArea.className = 'absolute w-[9.5%] aspect-square -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10';
                         hitArea.style.left = `${pos.left}%`;
@@ -581,7 +757,6 @@
                         };
                         layer.appendChild(hitArea);
 
-                        // Chấm xanh gợi ý nước đi hợp lệ
                         if (isValidTarget) {
                             const dot = document.createElement('div');
                             dot.className = 'valid-dot';
@@ -593,14 +768,13 @@
                 }
             }
 
-            // Cập nhật thanh hiển thị lượt đi
             const turnEl = document.getElementById('turn-indicator');
             if (currentTurn === myColor) {
-                turnEl.innerText = 'Lượt của bạn';
-                turnEl.className = 'px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold shadow';
+                turnEl.innerText = 'Lượt bạn';
+                turnEl.className = 'px-2 py-0.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow';
             } else {
-                turnEl.innerText = 'Lượt đối thủ';
-                turnEl.className = 'px-2.5 py-1 rounded-lg bg-amber-900/90 text-amber-300 font-semibold';
+                turnEl.innerText = 'Lượt bạn kia';
+                turnEl.className = 'px-2 py-0.5 rounded-lg bg-amber-900/90 text-amber-300 font-semibold text-[11px]';
             }
         }
 
@@ -610,7 +784,6 @@
             const clickedPiece = boardState[r][c];
             const myPrefix = myColor === 'red' ? 'R_' : 'B_';
 
-            // Chọn quân của mình
             if (clickedPiece && clickedPiece.startsWith(myPrefix)) {
                 selectedPiece = { r, c, piece: clickedPiece };
                 validMoves = getLegalMoves(boardState, r, c);
@@ -618,7 +791,6 @@
                 return;
             }
 
-            // Di chuyển đến ô hợp lệ
             if (selectedPiece) {
                 const isLegal = validMoves.some(m => m.r === r && m.c === c);
                 if (!isLegal) return;
@@ -633,7 +805,9 @@
                 selectedPiece = null;
                 validMoves = [];
                 currentTurn = currentTurn === 'red' ? 'black' : 'red';
+                turnTimeLeft = configTurnTime; // Reset thời gian lượt đi cho người tiếp theo
 
+                updateClockDisplay();
                 renderBoard();
                 evaluateTurnState();
 
@@ -642,7 +816,9 @@
                         type: 'MOVE',
                         boardState: boardState,
                         currentTurn: currentTurn,
-                        lastMove: lastMove
+                        lastMove: lastMove,
+                        redTotalLeft: redTotalLeft,
+                        blackTotalLeft: blackTotalLeft
                     });
                 }
             }
@@ -687,7 +863,7 @@
                             if (!board[nr][nc]) {
                                 moves.push({r: nr, c: nc});
                             } else {
-                                jumped = true; // Gặp ngòi
+                                jumped = true;
                             }
                         } else {
                             if (board[nr][nc]) {
@@ -751,7 +927,6 @@
             return moves;
         }
 
-        // Kiểm tra Tướng có đang bị chiếu hoặc lộ mặt Tướng không
         function isKingInCheck(board, color) {
             const kingName = color === 'red' ? 'R_GENERAL' : 'B_GENERAL';
             const oppKingName = color === 'red' ? 'B_GENERAL' : 'R_GENERAL';
@@ -765,7 +940,6 @@
             }
             if (kr === -1) return true;
 
-            // Kiểm tra luật Lộ mặt Tướng
             if (kc === okc && okr !== -1) {
                 let blocked = false;
                 const minR = Math.min(kr, okr), maxR = Math.max(kr, okr);
@@ -775,7 +949,6 @@
                 if (!blocked) return true;
             }
 
-            // Kiểm tra quân đối phương có ăn được Tướng không
             const oppPrefix = color === 'red' ? 'B_' : 'R_';
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 9; c++) {
@@ -788,7 +961,6 @@
             return false;
         }
 
-        // Lọc ra các nước đi hợp lệ (không để Tướng bị chiếu sau khi đi)
         function getLegalMoves(board, r, c) {
             const piece = board[r][c];
             if (!piece) return [];
@@ -803,7 +975,6 @@
             });
         }
 
-        // Đánh giá trạng thái Chiếu Tướng / Chiếu Bí sau mỗi nước đi
         function evaluateTurnState() {
             const inCheck = isKingInCheck(boardState, currentTurn);
             const alertEl = document.getElementById('check-alert');
@@ -813,7 +984,6 @@
                 alertEl.classList.add('hidden');
             }
 
-            // Kiểm tra bên tới lượt còn nước đi hợp lệ nào không
             const prefix = currentTurn === 'red' ? 'R_' : 'B_';
             let hasAnyMove = false;
             for (let r = 0; r < 10; r++) {
@@ -840,6 +1010,7 @@
 
         function showEndModal(icon, title, desc) {
             gameOver = true;
+            stopTimer();
             document.getElementById('end-icon').innerText = icon;
             document.getElementById('end-title').innerText = title;
             document.getElementById('end-desc').innerText = desc;
