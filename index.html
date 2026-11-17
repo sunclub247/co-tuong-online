@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cờ Tướng Online - Xiangqi</title>
+    <title>Cờ Tướng Online - Kỳ Đài Trực Tuyến</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS cho kết nối Online P2P Cloud -->
+    <!-- PeerJS Cloud -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -152,7 +152,7 @@
             </div>
             <div class="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-full text-[11px] border border-amber-800/60">
                 <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                <span id="status-text" class="text-amber-200 font-medium">Đang kết nối...</span>
+                <span id="status-text" class="text-amber-200 font-medium">Cloud...</span>
             </div>
         </div>
     </header>
@@ -160,7 +160,7 @@
     <!-- MAIN -->
     <main class="w-full max-w-[440px] flex-1 flex flex-col items-center justify-center my-2">
 
-        <!-- MÀN HÌNH ĐĂNG NHẬP / XÁC THỰC -->
+        <!-- MÀN HÌNH ĐĂNG NHẬP -->
         <div id="auth-screen" class="w-full bg-amber-950/95 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
             <div class="text-center space-y-1">
                 <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Đăng Nhập Kỳ Đài</h2>
@@ -194,63 +194,91 @@
             </div>
         </div>
 
-        <!-- MÀN HÌNH SẢNH CHỜ (LOBBY) -->
-        <div id="lobby-screen" class="hidden w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
+        <!-- MÀN HÌNH CHỌN KHU VỰC PHÒNG CHƠI (ROOMS SELECTION) -->
+        <div id="rooms-screen" class="hidden w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
             <div class="text-center space-y-1">
-                <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Kỳ Đài Trực Tuyến</h2>
+                <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Chọn Khu Vực Phòng Chơi</h2>
                 <p id="user-stats-desc" class="text-xs text-amber-400/80">Thắng: 0 | Thua: 0 | Hòa: 0</p>
             </div>
 
-            <div class="space-y-3 pt-1">
-                <div>
-                    <label class="block text-xs font-medium text-amber-300 mb-1.5">⏱️ Chế độ thời gian thi đấu:</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button type="button" onclick="selectTimePreset(300, 30, this)" class="time-option-btn active bg-black/40 border border-amber-700 rounded-xl p-2 text-center">
-                            <div class="text-sm font-bold">5 Phút</div>
-                            <div class="text-[10px] opacity-80">30s / lượt</div>
-                        </button>
-                        <button type="button" onclick="selectTimePreset(600, 60, this)" class="time-option-btn bg-black/40 border border-amber-700 rounded-xl p-2 text-center text-amber-200">
-                            <div class="text-sm font-bold">10 Phút</div>
-                            <div class="text-[10px] opacity-80">60s / lượt</div>
-                        </button>
-                        <button type="button" onclick="selectTimePreset(900, 180, this)" class="time-option-btn bg-black/40 border border-amber-700 rounded-xl p-2 text-center text-amber-200">
-                            <div class="text-sm font-bold">15 Phút</div>
-                            <div class="text-[10px] opacity-80">180s / lượt</div>
-                        </button>
+            <!-- Danh sách các phòng chơi -->
+            <div class="space-y-2.5 pt-1">
+                <div onclick="enterRoomArea('Vườn Đào (5 Phút)', 300, 30)" class="bg-amber-900/60 hover:bg-amber-900 border border-amber-700/80 p-3.5 rounded-xl cursor-pointer transition flex justify-between items-center shadow">
+                    <div>
+                        <div class="font-bold text-amber-200 text-sm">🌸 Phòng Vườn Đào</div>
+                        <div class="text-[11px] text-amber-300/80">Cờ chớp: 5 phút / ván (30s lượt)</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-block px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 text-[11px] font-bold" id="room-count-1">0 người</span>
+                        <div class="text-[10px] text-amber-400/60 mt-0.5">Bấm vào vào</div>
                     </div>
                 </div>
 
-                <button onclick="createRoom()" class="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-[0.98] flex items-center justify-center gap-2">
-                    <span>🏠 Tạo Phòng Mới (Cầm Quân Đỏ)</span>
-                </button>
-
-                <div class="relative flex py-1 items-center">
-                    <div class="flex-grow border-t border-amber-800"></div>
-                    <span class="flex-shrink mx-3 text-[11px] text-amber-400 uppercase tracking-wider">Hoặc vào phòng bạn bè</span>
-                    <div class="flex-grow border-t border-amber-800"></div>
+                <div onclick="enterRoomArea('Kỳ Đài (10 Phút)', 600, 60)" class="bg-amber-900/60 hover:bg-amber-900 border border-amber-700/80 p-3.5 rounded-xl cursor-pointer transition flex justify-between items-center shadow">
+                    <div>
+                        <div class="font-bold text-amber-200 text-sm">🏯 Phòng Kỳ Đài</div>
+                        <div class="text-[11px] text-amber-300/80">Cờ nhanh: 10 phút / ván (60s lượt)</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-block px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 text-[11px] font-bold" id="room-count-2">0 người</span>
+                        <div class="text-[10px] text-amber-400/60 mt-0.5">Bấm vào vào</div>
+                    </div>
                 </div>
 
-                <div class="flex gap-2">
-                    <input type="text" id="room-code-input" maxlength="6" placeholder="MÃ PHÒNG" class="flex-1 uppercase text-center tracking-[0.2em] bg-black/40 border border-amber-700 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-amber-100 focus:outline-none focus:border-amber-400">
-                    <button onclick="joinRoom()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition active:scale-[0.98]">
-                        Vào Phòng
-                    </button>
+                <div onclick="enterRoomArea('Cao Thủ (15 Phút)', 900, 180)" class="bg-amber-900/60 hover:bg-amber-900 border border-amber-700/80 p-3.5 rounded-xl cursor-pointer transition flex justify-between items-center shadow">
+                    <div>
+                        <div class="font-bold text-amber-200 text-sm">👑 Phòng Cao Thủ</div>
+                        <div class="text-[11px] text-amber-300/80">Cờ tiêu chuẩn: 15 phút / ván (180s lượt)</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-block px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 text-[11px] font-bold" id="room-count-3">0 người</span>
+                        <div class="text-[10px] text-amber-400/60 mt-0.5">Bấm vào vào</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tùy chọn nhập mã phòng riêng -->
+            <div class="pt-2">
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-amber-800"></div>
+                    <span class="flex-shrink mx-3 text-[11px] text-amber-400 uppercase tracking-wider">Hoặc nhập mã phòng nhanh</span>
+                    <div class="flex-grow border-t border-amber-800"></div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <input type="text" id="room-code-input" maxlength="6" placeholder="MÃ PHÒNG" class="flex-1 uppercase text-center tracking-[0.2em] bg-black/40 border border-amber-700 rounded-xl px-3 py-2 text-sm font-mono font-bold text-amber-100 focus:outline-none focus:border-amber-400">
+                    <button onclick="joinDirectRoom()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition">Vào</button>
                 </div>
             </div>
         </div>
 
-        <!-- MÀN HÌNH CHỜ ĐỐI THỦ -->
+        <!-- MÀN HÌNH SẢNH BÀN ĐẤU TRONG KHU VỰC (TABLES LOBBY) -->
+        <div id="tables-screen" class="hidden w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-3">
+            <div class="flex justify-between items-center border-b border-amber-800 pb-2">
+                <div>
+                    <h2 id="current-room-title" class="text-base font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Phòng Chơi</h2>
+                    <p class="text-[11px] text-amber-400/80">Chọn bàn trống để tạo mới hoặc bấm vào bàn chờ để tham gia</p>
+                </div>
+                <button onclick="backToRooms()" class="text-xs bg-amber-900 hover:bg-amber-800 border border-amber-700 px-3 py-1.5 rounded-lg text-amber-200">Quay lại</button>
+            </div>
+
+            <!-- Danh sách các bàn đấu (Bàn 1 đến Bàn 6) -->
+            <div id="tables-list-container" class="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                <!-- Nội dung các bàn render tự động bằng Javascript -->
+            </div>
+        </div>
+
+        <!-- MÀN HÌNH CHỜ ĐỐI THỦ VÀO BÀN -->
         <div id="waiting-screen" class="hidden w-full bg-amber-950/90 p-6 rounded-2xl shadow-2xl border border-amber-800 text-center space-y-4">
             <div class="inline-block p-3 rounded-full bg-amber-900/60 border border-amber-700 text-2xl animate-bounce">⏳</div>
             <h2 class="text-lg font-bold text-amber-200">Đang chờ đối thủ vào bàn...</h2>
             <p id="waiting-time-info" class="text-xs text-emerald-300 font-medium">Chế độ: 5 phút / ván • 30 giây / lượt</p>
-            <p class="text-xs text-amber-300/80">Gửi mã phòng dưới đây cho người chơi thứ 2:</p>
+            <p class="text-xs text-amber-300/80">Gửi mã bàn/phòng này cho bạn bè:</p>
             <div class="bg-black/50 border border-amber-600/80 py-3.5 rounded-xl shadow-inner">
                 <span id="display-room-code" class="text-3xl font-mono font-black tracking-[0.25em] text-emerald-400">------</span>
             </div>
             <div class="flex justify-center gap-3 pt-1">
                 <button onclick="copyRoomCode()" class="text-xs bg-amber-700 hover:bg-amber-600 px-4 py-2.5 rounded-xl text-white font-semibold transition shadow">📋 Sao chép mã</button>
-                <button onclick="location.reload()" class="text-xs bg-red-950 hover:bg-red-900 border border-red-800 px-4 py-2.5 rounded-xl text-red-200 transition">Hủy phòng</button>
+                <button onclick="cancelWaiting()" class="text-xs bg-red-950 hover:bg-red-900 border border-red-800 px-4 py-2.5 rounded-xl text-red-200 transition">Rời bàn</button>
             </div>
         </div>
 
@@ -359,13 +387,13 @@
             <p id="end-desc" class="text-xs text-amber-300/90">Ván đấu đã kết thúc.</p>
             <div class="flex gap-2 pt-2">
                 <button onclick="resetMatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs">Chơi ván mới</button>
-                <button onclick="location.reload()" class="flex-1 bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-2.5 rounded-xl text-xs">Thoát phòng</button>
+                <button onclick="backToRooms()" class="flex-1 bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-2.5 rounded-xl text-xs">Về sảnh phòng</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Cấu hình Firebase của bạn
+        // Cấu hình Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyCW3P94PqQ6UiorSOUYC3dqm-bXiYnxpAw",
           authDomain: "co-tuong-online-567c5.firebaseapp.com",
@@ -380,44 +408,40 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        let currentUser = null;
-        let userData = {
-            name: 'Kỳ Thủ',
-            elo: 1200,
-            wins: 0,
-            losses: 0,
-            draws: 0
-        };
+        let userData = { name: 'Kỳ Thủ', elo: 1200, wins: 0, losses: 0, draws: 0 };
+        let currentRoomName = '';
+        let configTotalTime = 300;
+        let configTurnTime = 30;
 
-        // Đăng nhập / Đăng ký handlers
+        // Đăng nhập / Đăng ký
         async function handleLogin() {
             const email = document.getElementById('auth-email').value.trim();
             const pass = document.getElementById('auth-password').value.trim();
-            if (!email || !pass) { alert('Vui lòng nhập đầy đủ email và mật khẩu!'); return; }
+            if (!email || !pass) { alert('Vui lòng nhập email và mật khẩu!'); return; }
             try {
                 const res = await auth.signInWithEmailAndPassword(email, pass);
                 await loadUserData(res.user.uid);
-                enterLobby();
-            } catch (err) { alert('Lỗi đăng nhập: ' + err.message); }
+                enterRoomsScreen();
+            } catch (err) { alert('Lỗi: ' + err.message); }
         }
 
         async function handleRegister() {
             const email = document.getElementById('auth-email').value.trim();
             const pass = document.getElementById('auth-password').value.trim();
-            if (!email || !pass) { alert('Vui lòng nhập đầy đủ email và mật khẩu!'); return; }
+            if (!email || !pass) { alert('Vui lòng nhập email và mật khẩu!'); return; }
             try {
                 const res = await auth.createUserWithEmailAndPassword(email, pass);
                 const defaultData = { name: email.split('@')[0], elo: 1200, wins: 0, losses: 0, draws: 0 };
                 await db.collection('users').doc(res.user.uid).set(defaultData);
                 userData = defaultData;
                 userData.uid = res.user.uid;
-                enterLobby();
-            } catch (err) { alert('Lỗi đăng ký: ' + err.message); }
+                enterRoomsScreen();
+            } catch (err) { alert('Lỗi: ' + err.message); }
         }
 
         function handleGuestLogin() {
-            userData = { name: 'Kỳ Thủ Khách_' + Math.floor(Math.random()*1000), elo: 1200, wins: 0, losses: 0, draws: 0, uid: 'guest_' + Math.random() };
-            enterLobby();
+            userData = { name: 'Khách_' + Math.floor(Math.random()*1000), elo: 1200, wins: 0, losses: 0, draws: 0, uid: 'guest_' + Math.random() };
+            enterRoomsScreen();
         }
 
         async function loadUserData(uid) {
@@ -436,28 +460,188 @@
             if (result === 'win') { userData.wins++; userData.elo += 15; }
             else if (result === 'loss') { userData.losses++; userData.elo = Math.max(100, userData.elo - 15); }
             else if (result === 'draw') { userData.draws++; }
-
             try {
-                await db.collection('users').doc(userData.uid).update({
-                    wins: userData.wins,
-                    losses: userData.losses,
-                    draws: userData.draws,
-                    elo: userData.elo
-                });
+                await db.collection('users').doc(userData.uid).update({ wins: userData.wins, losses: userData.losses, draws: userData.draws, elo: userData.elo });
             } catch(e) { console.error(e); }
         }
 
-        function enterLobby() {
+        function enterRoomsScreen() {
             document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
+            document.getElementById('rooms-screen').classList.remove('hidden');
             document.getElementById('user-info-badge').classList.remove('hidden');
             document.getElementById('nav-username').innerText = userData.name;
             document.getElementById('nav-elo').innerText = userData.elo;
             document.getElementById('user-stats-desc').innerText = `Thắng: ${userData.wins} | Thua: ${userData.losses} | Hòa: ${userData.draws} (Elo: ${userData.elo})`;
             myName = userData.name;
+            listenRoomsActivity();
         }
 
-        // --- CỜ TƯỚNG & HỆ THỐNG THỜI GIAN & PEERJS CLOUD ---
+        // --- HỆ THỐNG KHU VỰC PHÒNG & BÀN ĐẤU (FIRESTORE REALTIME) ---
+        let roomsUnsubscribe = null;
+
+        function enterRoomArea(roomName, totalSec, turnSec) {
+            currentRoomName = roomName;
+            configTotalTime = totalSec;
+            configTurnTime = turnSec;
+            document.getElementById('rooms-screen').classList.add('hidden');
+            document.getElementById('tables-screen').classList.remove('hidden');
+            document.getElementById('current-room-title').innerText = `Khu vực: ${roomName}`;
+            listenTablesActivity();
+        }
+
+        function backToRooms() {
+            if (tablesUnsubscribe) { tablesUnsubscribe(); tablesUnsubscribe = null; }
+            stopTimer();
+            if (peer) peer.destroy();
+            initPeer();
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('waiting-screen').classList.add('hidden');
+            document.getElementById('tables-screen').classList.add('hidden');
+            document.getElementById('end-modal').classList.add('hidden');
+            document.getElementById('rooms-screen').classList.remove('hidden');
+        }
+
+        // Lắng nghe số lượng người online ở các phòng ngoài sảnh
+        function listenRoomsActivity() {
+            db.collection('tables').onSnapshot(snapshot => {
+                let counts = { 'Vườn Đào (5 Phút)': 0, 'Kỳ Đài (10 Phút)': 0, 'Cao Thủ (15 Phút)': 0 };
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    if (counts[d.roomArea] !== undefined) {
+                        counts[d.roomArea] += (d.status === 'playing' ? 2 : (d.status === 'waiting' ? 1 : 0));
+                    }
+                });
+                document.getElementById('room-count-1').innerText = `${counts['Vườn Đào (5 Phút)']} người`;
+                document.getElementById('room-count-2').innerText = `${counts['Kỳ Đài (10 Phút)']} người`;
+                document.getElementById('room-count-3').innerText = `${counts['Cao Thủ (15 Phút)']} người`;
+            });
+        }
+
+        let tablesUnsubscribe = null;
+
+        function listenTablesActivity() {
+            if (tablesUnsubscribe) tablesUnsubscribe();
+            tablesUnsubscribe = db.collection('tables').where('roomArea', '==', currentRoomName).onSnapshot(snapshot => {
+                let tablesMap = {};
+                for (let i = 1; i <= 6; i++) {
+                    tablesMap[i] = { tableId: i, status: 'empty', hostName: '', guestName: '', roomCode: '' };
+                }
+                snapshot.forEach(doc => {
+                    let d = doc.data();
+                    if (d.tableNumber >= 1 && d.tableNumber <= 6) {
+                        tablesMap[d.tableNumber] = { id: doc.id, ...d };
+                    }
+                });
+                renderTablesUI(tablesMap);
+            });
+        }
+
+        function renderTablesUI(tablesMap) {
+            const container = document.getElementById('tables-list-container');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 6; i++) {
+                let t = tablesMap[i];
+                let div = document.createElement('div');
+                div.className = 'bg-black/40 border border-amber-800/70 p-3 rounded-xl flex justify-between items-center';
+
+                let statusBadge = '';
+                let actionBtn = '';
+
+                if (t.status === 'playing') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 text-[10px] font-bold">🔴 Đang đấu (2/2)</span>`;
+                    actionBtn = `<span class="text-xs text-amber-400/50 italic">Đang đánh</span>`;
+                } else if (t.status === 'waiting') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded bg-amber-900/80 text-amber-200 border border-amber-700 text-[10px] font-bold">🟡 Chờ đối thủ (1/2)</span>`;
+                    actionBtn = `<button onclick="joinTable(${i}, '${t.roomCode}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow">Ngồi chơi</button>`;
+                } else {
+                    statusBadge = `<span class="px-2 py-0.5 rounded bg-stone-900 text-stone-300 border border-stone-700 text-[10px]">⚪ Bàn trống</span>`;
+                    actionBtn = `<button onclick="createTable(${i})" class="bg-amber-700 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow">Tạo bàn</button>`;
+                }
+
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold text-amber-200 text-xs mb-1">🎮 Bàn Số ${i}</div>
+                        <div class="text-[11px] text-amber-300/80">
+                            ${t.status === 'playing' ? `⚔️ ${t.hostName} vs ${t.guestName}` : (t.status === 'waiting' ? `👤 Chủ bàn: ${t.hostName}` : 'Chưa có người chơi')}
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1.5">
+                        ${statusBadge}
+                        ${actionBtn}
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        // Tạo bàn mới (Làm chủ bàn - Quân Đỏ)
+        async function createTable(tableNum) {
+            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            myColor = 'red';
+            
+            initPeer('xiangqi_' + roomCode);
+            peer.on('open', async () => {
+                await db.collection('tables').add({
+                    roomArea: currentRoomName,
+                    tableNumber: tableNum,
+                    roomCode: roomCode,
+                    status: 'waiting',
+                    hostName: userData.name,
+                    guestName: '',
+                    totalTime: configTotalTime,
+                    turnTime: configTurnTime,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                document.getElementById('tables-screen').classList.add('hidden');
+                document.getElementById('waiting-screen').classList.remove('hidden');
+                document.getElementById('display-room-code').innerText = roomCode;
+                document.getElementById('waiting-time-info').innerText = `${currentRoomName} • Bàn số ${tableNum}`;
+            });
+        }
+
+        // Ngồi vào bàn đang chờ (Quân Đen)
+        async function joinTable(tableNum, code) {
+            roomCode = code;
+            myColor = 'black';
+
+            // Tìm doc của bàn này để cập nhật
+            const snap = await db.collection('tables').where('roomCode', '==', roomCode).get();
+            if (snap.empty) { alert('Bàn này đã kết thúc hoặc không tồn tại!'); return; }
+            
+            let docId = snap.docs[0].id;
+            let d = snap.docs[0].data();
+            configTotalTime = d.totalTime || 300;
+            configTurnTime = d.turnTime || 30;
+            opponentName = d.hostName;
+
+            await db.collection('tables').doc(docId).update({
+                status: 'playing',
+                guestName: userData.name
+            });
+
+            conn = peer.connect('xiangqi_' + roomCode, { reliable: true });
+            setupConnection();
+        }
+
+        async function joinDirectRoom() {
+            const inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (inputCode.length !== 6) { alert('Vui lòng nhập đúng 6 ký tự mã phòng!'); return; }
+            roomCode = inputCode;
+            myColor = 'black';
+            conn = peer.connect('xiangqi_' + roomCode, { reliable: true });
+            setupConnection();
+        }
+
+        async function cancelWaiting() {
+            // Xóa bàn chờ trên Firestore
+            const snap = await db.collection('tables').where('roomCode', '==', roomCode).get();
+            snap.forEach(async doc => { await doc.ref.delete(); });
+            backToRooms();
+        }
+
+        // --- CỜ TƯỚNG & KẾT NỐI P2P CLOUD ---
         (function drawMarkers() {
             const markersGroup = document.getElementById('board-markers');
             const positions = [
@@ -465,7 +649,6 @@
                 {r: 3, c: 0}, {r: 3, c: 2}, {r: 3, c: 4}, {r: 3, c: 6}, {r: 3, c: 8},
                 {r: 6, c: 0}, {r: 6, c: 2}, {r: 6, c: 4}, {r: 6, c: 6}, {r: 6, c: 8}
             ];
-
             positions.forEach(pos => {
                 const cx = 70 + pos.c * 95;
                 const cy = 70 + pos.r * 95.555;
@@ -485,23 +668,10 @@
             });
         })();
 
-        let configTotalTime = 300;
-        let configTurnTime = 30;
         let redTotalLeft = 300;
         let blackTotalLeft = 300;
         let turnTimeLeft = 30;
         let timerInterval = null;
-
-        function selectTimePreset(totalSec, turnSec, btnEl) {
-            configTotalTime = totalSec;
-            configTurnTime = turnSec;
-            document.querySelectorAll('.time-option-btn').forEach(b => {
-                b.classList.remove('active');
-                b.classList.add('text-amber-200');
-            });
-            btnEl.classList.add('active');
-            btnEl.classList.remove('text-amber-200');
-        }
 
         function formatTimeMMSS(seconds) {
             const s = Math.max(0, Math.floor(seconds));
@@ -510,8 +680,6 @@
 
         let peer = null;
         let conn = null;
-        let roomCode = '';
-        let myColor = 'red';
         let currentTurn = 'red';
         let selectedPiece = null;
         let validMoves = [];
@@ -540,64 +708,25 @@
             'B_GENERAL': '將', 'B_ADVISOR': '士', 'B_ELEPHANT': '象', 'B_HORSE': '馬', 'B_ROOK': '車', 'B_CANNON': '砲', 'B_PAWN': '卒'
         };
 
-        // Khởi tạo PeerJS Cloud với tùy chọn STUN server đảm bảo chuyển màu xanh lá ổn định
         function initPeer(customId = null) {
             if (peer) peer.destroy();
-            
-            const peerOptions = {
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                }
-            };
-
+            const peerOptions = { config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } };
             peer = customId ? new Peer(customId, peerOptions) : new Peer(peerOptions);
 
             peer.on('open', () => {
                 document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
-                document.getElementById('status-text').innerText = 'Online (Cloud)';
+                document.getElementById('status-text').innerText = 'Online';
             });
-
-            peer.on('error', (err) => {
-                console.error(err);
-                if (err.type === 'unavailable-id') {
-                    alert('Mã phòng bị trùng, vui lòng bấm Tạo Phòng lại!');
-                } else {
-                    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
-                    document.getElementById('status-text').innerText = 'Lỗi mạng Cloud';
-                }
+            peer.on('error', () => {
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+                document.getElementById('status-text').innerText = 'Lỗi mạng';
             });
-
             peer.on('connection', (connection) => {
                 conn = connection;
                 setupConnection();
             });
         }
-
         initPeer();
-
-        function createRoom() {
-            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            myColor = 'red';
-            initPeer('xiangqi_' + roomCode);
-            peer.on('open', () => {
-                document.getElementById('lobby-screen').classList.add('hidden');
-                document.getElementById('waiting-screen').classList.remove('hidden');
-                document.getElementById('display-room-code').innerText = roomCode;
-                document.getElementById('waiting-time-info').innerText = `Chế độ: ${configTotalTime / 60} phút / ván • ${configTurnTime}s / lượt`;
-            });
-        }
-
-        function joinRoom() {
-            const inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
-            if (inputCode.length !== 6) { alert('Vui lòng nhập đúng 6 ký tự mã phòng!'); return; }
-            roomCode = inputCode;
-            myColor = 'black';
-            conn = peer.connect('xiangqi_' + roomCode, { reliable: true });
-            setupConnection();
-        }
 
         function setupConnection() {
             conn.on('open', () => { conn.send({ type: 'JOIN', name: myName }); });
@@ -632,12 +761,12 @@
                         updateStatsOnCloud('win');
                     }
                 } else if (data.type === 'SURRENDER') {
-                    showEndModal('🏆', 'Chiến Thắng!', 'Đối thủ đã xin đầu hàng.');
+                    showEndModal('🏆', 'Chiến Thắng!', 'Đối thủ đã đầu hàng.');
                     updateStatsOnCloud('win');
                 } else if (data.type === 'DRAW_REQ') {
-                    if (confirm('Đối thủ muốn xin hòa. Bạn có đồng ý không?')) {
+                    if (confirm('Đối thủ muốn xin hòa. Đồng ý không?')) {
                         conn.send({ type: 'DRAW_ACCEPT' });
-                        showEndModal('🤝', 'Hòa Cờ!', 'Hai kỳ thủ đã đồng ý hòa.');
+                        showEndModal('🤝', 'Hòa Cờ!', 'Hai bên đã đồng ý hòa.');
                         updateStatsOnCloud('draw');
                     }
                 } else if (data.type === 'DRAW_ACCEPT') {
@@ -652,6 +781,7 @@
 
         function startGame() {
             document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('tables-screen').classList.add('hidden');
             document.getElementById('waiting-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
             document.getElementById('my-name').innerText = `${myName} (${myColor === 'red' ? 'Đỏ' : 'Đen'})`;
@@ -836,139 +966,3 @@
                         if (!jumped) { if (!board[nr][nc]) moves.push({r: nr, c: nc}); else jumped = true; }
                         else { if (board[nr][nc]) { if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc}); break; } }
                         nr += dr; nc += dc;
-                    }
-                });
-            } else if (type === 'HORSE') {
-                [
-                    {dr: -2, dc: -1, lr: -1, lc: 0}, {dr: -2, dc: 1, lr: -1, lc: 0},
-                    {dr: 2, dc: -1, lr: 1, lc: 0},   {dr: 2, dc: 1, lr: 1, lc: 0},
-                    {dr: -1, dc: -2, lr: 0, lc: -1}, {dr: 1, dc: -2, lr: 0, lc: -1},
-                    {dr: -1, dc: 2, lr: 0, lc: 1},   {dr: 1, dc: 2, lr: 0, lc: 1}
-                ].forEach(j => {
-                    if (r + j.dr >= 0 && r + j.dr <= 9 && c + j.dc >= 0 && c + j.dc <= 8 && !board[r + j.lr][c + j.lc]) {
-                        if (isEnemyOrEmpty(r + j.dr, c + j.dc)) moves.push({r: r + j.dr, c: c + j.dc});
-                    }
-                });
-            } else if (type === 'ELEPHANT') {
-                [
-                    {dr: -2, dc: -2, er: -1, ec: -1}, {dr: -2, dc: 2, er: -1, ec: 1},
-                    {dr: 2, dc: -2, er: 1, ec: -1},   {dr: 2, dc: 2, er: 1, ec: 1}
-                ].forEach(s => {
-                    const nr = r + s.dr, nc = c + s.dc;
-                    const inOwn = isRed ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4);
-                    if (inOwn && nc >= 0 && nc <= 8 && !board[r + s.er][c + s.ec] && isEnemyOrEmpty(nr, nc)) {
-                        moves.push({r: nr, c: nc});
-                    }
-                });
-            } else if (type === 'ADVISOR' || type === 'GENERAL') {
-                [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
-                    const nr = r + dr, nc = c + dc;
-                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
-                    if (type === 'ADVISOR') {
-                        const diag = [[-1,-1],[-1,1],[1,-1],[1,1]].some(d => d[0] === dr && d[1] === dc);
-                        if (!diag) return;
-                    }
-                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                });
-            } else if (type === 'PAWN') {
-                const forward = isRed ? -1 : 1;
-                if (isEnemyOrEmpty(r + forward, c)) moves.push({r: r + forward, c});
-                if (isRed ? r <= 4 : r >= 5) {
-                    if (isEnemyOrEmpty(r, c - 1)) moves.push({r, c: c - 1});
-                    if (isEnemyOrEmpty(r, c + 1)) moves.push({r, c: c + 1});
-                }
-            }
-            return moves;
-        }
-
-        function isKingInCheck(board, color) {
-            const kingName = color === 'red' ? 'R_GENERAL' : 'B_GENERAL';
-            const oppKing = color === 'red' ? 'B_GENERAL' : 'R_GENERAL';
-            let kr = -1, kc = -1, okr = -1, okc = -1;
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (board[r][c] === kingName) { kr = r; kc = c; }
-                    if (board[r][c] === oppKing) { okr = r; okc = c; }
-                }
-            }
-            if (kr === -1) return true;
-            if (kc === okc && okr !== -1) {
-                let blocked = false;
-                for (let i = Math.min(kr, okr) + 1; i < Math.max(kr, okr); i++) {
-                    if (board[i][kc]) { blocked = true; break; }
-                }
-                if (!blocked) return true;
-            }
-            const oppPrefix = color === 'red' ? 'B_' : 'R_';
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (board[r][c] && board[r][c].startsWith(oppPrefix)) {
-                        if (getPseudoMoves(board, r, c).some(m => m.r === kr && m.c === kc)) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function getLegalMoves(board, r, c) {
-            const piece = board[r][c];
-            if (!piece) return [];
-            const color = piece.startsWith('R_') ? 'red' : 'black';
-            return getPseudoMoves(board, r, c).filter(m => {
-                const copy = board.map(row => [...row]);
-                copy[m.r][m.c] = copy[r][c];
-                copy[r][c] = null;
-                return !isKingInCheck(copy, color);
-            });
-        }
-
-        function evaluateTurnState() {
-            if (isKingInCheck(boardState, currentTurn)) document.getElementById('check-alert').classList.remove('hidden');
-            else document.getElementById('check-alert').classList.add('hidden');
-
-            const prefix = currentTurn === 'red' ? 'R_' : 'B_';
-            let hasAny = false;
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (boardState[r][c] && boardState[r][c].startsWith(prefix)) {
-                        if (getLegalMoves(boardState, r, c).length > 0) { hasAny = true; break; }
-                    }
-                }
-                if (hasAny) break;
-            }
-
-            if (!hasAny) {
-                const winner = currentTurn === 'red' ? 'black' : 'red';
-                if (winner === myColor) {
-                    showEndModal('🏆', 'Chiếu Bí - Thắng!', 'Đối thủ hết nước đi.');
-                    updateStatsOnCloud('win');
-                } else {
-                    showEndModal('🏳️', 'Thua Cuộc!', 'Bạn đã bị chiếu bí.');
-                    updateStatsOnCloud('loss');
-                }
-            }
-        }
-
-        function showEndModal(icon, title, desc) {
-            gameOver = true;
-            stopTimer();
-            document.getElementById('end-icon').innerText = icon;
-            document.getElementById('end-title').innerText = title;
-            document.getElementById('end-desc').innerText = desc;
-            document.getElementById('end-modal').classList.remove('hidden');
-        }
-
-        function surrender() {
-            if (confirm('Bạn có chắc muốn đầu hàng?')) {
-                if (conn && conn.open) conn.send({ type: 'SURRENDER' });
-                showEndModal('🏳️', 'Đã Đầu Hàng', 'Bạn đã thua trận này.');
-                updateStatsOnCloud('loss');
-            }
-        }
-
-        function requestDraw() {
-            if (conn && conn.open) { conn.send({ type: 'DRAW_REQ' }); alert('Đã gửi yêu cầu hòa.'); }
-        }
-    </script>
-</body>
-</html>
