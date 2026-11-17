@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cờ Tướng Online - Xiangqi</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS cho kết nối Online P2P Cloud -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&display=swap');
 
@@ -15,7 +21,6 @@
             touch-action: manipulation;
         }
 
-        /* Khung bàn cờ gỗ có viền rộng rãi xung quanh */
         .board-frame {
             background: linear-gradient(135deg, #e6b873 0%, #d49a4a 50%, #c28334 100%);
             border: 6px solid #5c2c0c;
@@ -30,7 +35,6 @@
             aspect-ratio: 9 / 10;
         }
 
-        /* Quân cờ gỗ 3D khắc chữ */
         .xiangqi-piece {
             position: absolute;
             width: 9.6%;
@@ -96,7 +100,6 @@
                 0 0 0 2.5px #2563eb !important;
         }
 
-        /* Điểm gợi ý nước đi hợp lệ */
         .valid-dot {
             position: absolute;
             width: 3.4%;
@@ -127,10 +130,6 @@
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        /* Nút chọn thời gian */
-        .time-option-btn {
-            transition: all 0.15s ease;
-        }
         .time-option-btn.active {
             background-color: rgba(16, 185, 129, 0.25);
             border-color: #10b981;
@@ -147,31 +146,64 @@
             <span class="text-xl">🏮</span>
             <h1 class="text-base sm:text-lg font-bold tracking-wide text-amber-300" style="font-family: 'Noto Serif TC', serif;">CỜ TƯỚNG ONLINE</h1>
         </div>
-        <div class="flex items-center gap-2 bg-black/40 px-2.5 py-1 rounded-full text-[11px] border border-amber-800/60">
-            <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            <span id="status-text" class="text-amber-200 font-medium">Đang kết nối...</span>
+        <div class="flex items-center gap-2">
+            <div id="user-info-badge" class="hidden text-[11px] bg-amber-900/80 px-2.5 py-1 rounded-full border border-amber-700">
+                <span id="nav-username" class="font-bold text-amber-200">Kỳ Thủ</span> (<span id="nav-elo" class="text-emerald-400 font-bold">1200</span>)
+            </div>
+            <div class="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-full text-[11px] border border-amber-800/60">
+                <span id="status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                <span id="status-text" class="text-amber-200 font-medium">Cloud...</span>
+            </div>
         </div>
     </header>
 
     <!-- MAIN -->
     <main class="w-full max-w-[440px] flex-1 flex flex-col items-center justify-center my-2">
 
-        <!-- MÀN HÌNH SẢNH CHỜ -->
-        <div id="lobby-screen" class="w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
+        <!-- MÀN HÌNH ĐĂNG NHẬP / XÁC THỰC -->
+        <div id="auth-screen" class="w-full bg-amber-950/95 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
+            <div class="text-center space-y-1">
+                <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Đăng Nhập Kỳ Đài</h2>
+                <p class="text-xs text-amber-400/80">Lưu điểm Elo và thành tích thi đấu trên hệ thống</p>
+            </div>
+
+            <div class="space-y-3 pt-2">
+                <div>
+                    <label class="block text-xs font-medium text-amber-300 mb-1">Email:</label>
+                    <input type="email" id="auth-email" placeholder="example@gmail.com" class="w-full bg-black/40 border border-amber-700 rounded-xl px-3.5 py-2.5 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-amber-300 mb-1">Mật khẩu:</label>
+                    <input type="password" id="auth-password" placeholder="••••••••" class="w-full bg-black/40 border border-amber-700 rounded-xl px-3.5 py-2.5 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div class="flex gap-2 pt-1">
+                    <button onclick="handleLogin()" class="flex-1 bg-amber-700 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl text-xs shadow transition">Đăng Nhập</button>
+                    <button onclick="handleRegister()" class="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs shadow transition">Đăng Ký</button>
+                </div>
+
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-amber-800"></div>
+                    <span class="flex-shrink mx-3 text-[11px] text-amber-400 uppercase tracking-wider">Hoặc</span>
+                    <div class="flex-grow border-t border-amber-800"></div>
+                </div>
+
+                <button onclick="handleGuestLogin()" class="w-full bg-black/40 hover:bg-black/60 border border-amber-700 text-amber-200 font-bold py-2.5 rounded-xl text-xs transition">
+                    🎮 Chơi nhanh (Khách vãng lai)
+                </button>
+            </div>
+        </div>
+
+        <!-- MÀN HÌNH SẢNH CHỜ (LOBBY) -->
+        <div id="lobby-screen" class="hidden w-full bg-amber-950/90 p-5 rounded-2xl shadow-2xl border border-amber-800 space-y-4">
             <div class="text-center space-y-1">
                 <h2 class="text-xl font-bold text-amber-200" style="font-family: 'Noto Serif TC', serif;">Kỳ Đài Trực Tuyến</h2>
-                <p class="text-xs text-amber-400/80">Chọn thời gian thi đấu, tạo phòng và gửi mã 6 ký tự cho bạn bè</p>
+                <p id="user-stats-desc" class="text-xs text-amber-400/80">Thắng: 0 | Thua: 0 | Hòa: 0</p>
             </div>
 
             <div class="space-y-3 pt-1">
                 <div>
-                    <label class="block text-xs font-medium text-amber-300 mb-1">Tên kỳ thủ của bạn:</label>
-                    <input type="text" id="player-name" value="Kỳ Thủ" maxlength="16" class="w-full bg-black/40 border border-amber-700 rounded-xl px-3.5 py-2.5 text-sm text-amber-100 focus:outline-none focus:border-amber-400">
-                </div>
-
-                <!-- CHỌN THỜI GIAN VÁN ĐẤU -->
-                <div>
-                    <label class="block text-xs font-medium text-amber-300 mb-1.5">⏱️ Chế độ thời gian (Ván mới):</label>
+                    <label class="block text-xs font-medium text-amber-300 mb-1.5">⏱️ Chế độ thời gian thi đấu:</label>
                     <div class="grid grid-cols-3 gap-2">
                         <button type="button" onclick="selectTimePreset(300, 30, this)" class="time-option-btn active bg-black/40 border border-amber-700 rounded-xl p-2 text-center">
                             <div class="text-sm font-bold">5 Phút</div>
@@ -225,14 +257,13 @@
         <!-- MÀN HÌNH BÀN CỜ -->
         <div id="game-screen" class="hidden w-full flex flex-col items-center gap-2">
             
-            <!-- Thanh thông tin & Đồng hồ ĐỐI THỦ (Phía trên) -->
+            <!-- Thanh thông tin đối thủ (Phía trên) -->
             <div class="w-full flex justify-between items-center bg-amber-950/90 px-3 py-2 rounded-xl text-xs border border-amber-800/80 shadow">
                 <div class="flex items-center gap-2">
                     <span id="opp-badge" class="w-3 h-3 rounded-full bg-stone-900 border border-amber-400"></span>
                     <span id="opponent-name" class="font-bold text-amber-200 truncate max-w-[110px]">Đối thủ</span>
                 </div>
 
-                <!-- Đồng hồ đối thủ -->
                 <div class="flex items-center gap-1.5 font-mono">
                     <span id="opp-total-clock" class="px-2 py-0.5 rounded bg-black/60 border border-amber-700/70 text-amber-100 font-bold text-xs">05:00</span>
                     <span id="opp-turn-clock" class="px-1.5 py-0.5 rounded bg-amber-900/80 border border-amber-700/50 text-amber-300 text-[11px]">30s</span>
@@ -244,14 +275,12 @@
                 </div>
             </div>
 
-            <!-- BÀN CỜ TƯỚNG CHUẨN TỌA ĐỘ + VIỀN RỘNG -->
+            <!-- BÀN CỜ TƯỚNG -->
             <div class="board-frame" id="board-frame">
                 <svg viewBox="0 0 900 1000" class="w-full h-full block pointer-events-none">
-                    <!-- Viền khung đôi trang trí ngoài lưới cờ -->
                     <rect x="56" y="56" width="788" height="888" fill="none" stroke="#5c2c0c" stroke-width="5"/>
                     <rect x="70" y="70" width="760" height="860" fill="none" stroke="#5c2c0c" stroke-width="2.5"/>
 
-                    <!-- 10 Đường ngang -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="70" y1="70" x2="830" y2="70"/>
                         <line x1="70" y1="165.56" x2="830" y2="165.56"/>
@@ -265,7 +294,6 @@
                         <line x1="70" y1="930" x2="830" y2="930"/>
                     </g>
 
-                    <!-- 9 Đường dọc - Ngắt quãng ở sông -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="165" y1="70" x2="165" y2="452.22"/>
                         <line x1="260" y1="70" x2="260" y2="452.22"/>
@@ -284,38 +312,32 @@
                         <line x1="735" y1="547.78" x2="735" y2="930"/>
                     </g>
 
-                    <!-- Đường chéo Cung Tướng Trên -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="355" y1="70" x2="545" y2="261.11"/>
                         <line x1="545" y1="70" x2="355" y2="261.11"/>
                     </g>
 
-                    <!-- Đường chéo Cung Tướng Dưới -->
                     <g stroke="#5c2c0c" stroke-width="2.2">
                         <line x1="355" y1="738.89" x2="545" y2="930"/>
                         <line x1="545" y1="738.89" x2="355" y2="930"/>
                     </g>
 
-                    <!-- Chữ Sở Hà - Hán Giới -->
                     <text x="260" y="514" fill="#5c2c0c" fill-opacity="0.7" font-size="42" font-family="'Noto Serif TC', serif" font-weight="bold" text-anchor="middle" letter-spacing="14">楚河</text>
                     <text x="640" y="514" fill="#5c2c0c" fill-opacity="0.7" font-size="42" font-family="'Noto Serif TC', serif" font-weight="bold" text-anchor="middle" letter-spacing="14">漢界</text>
 
-                    <!-- Các dấu hoa thị (+) đánh dấu vị trí Pháo và Tốt -->
                     <g id="board-markers" stroke="#5c2c0c" stroke-width="2.2" fill="none"></g>
                 </svg>
 
-                <!-- Lớp chứa quân cờ & vùng bấm -->
                 <div id="pieces-layer" class="absolute inset-0"></div>
             </div>
 
-            <!-- Thanh thông tin & Đồng hồ BẢN THÂN + Nút chức năng (Phía dưới) -->
+            <!-- Thanh thông tin bản thân (Phía dưới) -->
             <div class="w-full flex justify-between items-center bg-amber-950/90 px-3 py-2 rounded-xl text-xs border border-amber-800/80 shadow">
                 <div class="flex items-center gap-2">
                     <span id="my-badge" class="w-3 h-3 rounded-full bg-red-600 border border-amber-300"></span>
                     <span id="my-name" class="font-bold text-amber-200 truncate max-w-[100px]">Bạn</span>
                 </div>
 
-                <!-- Đồng hồ bản thân -->
                 <div class="flex items-center gap-1.5 font-mono">
                     <span id="my-total-clock" class="px-2 py-0.5 rounded bg-black/60 border border-amber-700/70 text-amber-100 font-bold text-xs">05:00</span>
                     <span id="my-turn-clock" class="px-1.5 py-0.5 rounded bg-amber-900/80 border border-amber-700/50 text-amber-300 text-[11px]">30s</span>
@@ -336,700 +358,4 @@
             <h3 id="end-title" class="text-xl font-bold text-amber-200">Chiến Thắng!</h3>
             <p id="end-desc" class="text-xs text-amber-300/90">Ván đấu đã kết thúc.</p>
             <div class="flex gap-2 pt-2">
-                <button onclick="resetMatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs">Chơi ván mới</button>
-                <button onclick="location.reload()" class="flex-1 bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-2.5 rounded-xl text-xs">Thoát phòng</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Vẽ tự động các dấu hoa thị (+) tại vị trí Pháo và Tốt trên SVG
-        (function drawMarkers() {
-            const markersGroup = document.getElementById('board-markers');
-            const positions = [
-                {r: 2, c: 1}, {r: 2, c: 7},
-                {r: 7, c: 1}, {r: 7, c: 7},
-                {r: 3, c: 0}, {r: 3, c: 2}, {r: 3, c: 4}, {r: 3, c: 6}, {r: 3, c: 8},
-                {r: 6, c: 0}, {r: 6, c: 2}, {r: 6, c: 4}, {r: 6, c: 6}, {r: 6, c: 8}
-            ];
-
-            positions.forEach(pos => {
-                const cx = 70 + pos.c * 95;
-                const cy = 70 + pos.r * 95.555;
-                const g = 6;
-                const l = 14;
-
-                let d = '';
-                if (pos.c > 0) {
-                    d += `M ${cx - g - l} ${cy - g} L ${cx - g} ${cy - g} L ${cx - g} ${cy - g - l} `;
-                    d += `M ${cx - g - l} ${cy + g} L ${cx - g} ${cy + g} L ${cx - g} ${cy + g + l} `;
-                }
-                if (pos.c < 8) {
-                    d += `M ${cx + g + l} ${cy - g} L ${cx + g} ${cy - g} L ${cx + g} ${cy - g - l} `;
-                    d += `M ${cx + g + l} ${cy + g} L ${cx + g} ${cy + g} L ${cx + g} ${cy + g + l} `;
-                }
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('d', d);
-                markersGroup.appendChild(path);
-            });
-        })();
-
-        // Biến cấu hình thời gian (Mặc định 5 phút = 300s, mỗi lượt = 30s)
-        let configTotalTime = 300;
-        let configTurnTime = 30;
-        let redTotalLeft = 300;
-        let blackTotalLeft = 300;
-        let turnTimeLeft = 30;
-        let timerInterval = null;
-
-        function selectTimePreset(totalSec, turnSec, btnEl) {
-            configTotalTime = totalSec;
-            configTurnTime = turnSec;
-            document.querySelectorAll('.time-option-btn').forEach(b => {
-                b.classList.remove('active');
-                b.classList.add('text-amber-200');
-            });
-            btnEl.classList.add('active');
-            btnEl.classList.remove('text-amber-200');
-        }
-
-        function formatTimeMMSS(seconds) {
-            const s = Math.max(0, Math.floor(seconds));
-            const mins = Math.floor(s / 60);
-            const secs = s % 60;
-            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        }
-
-        // Biến trạng thái mạng & trò chơi
-        let peer = null;
-        let conn = null;
-        let roomCode = '';
-        let myColor = 'red';
-        let currentTurn = 'red';
-        let selectedPiece = null;
-        let validMoves = [];
-        let lastMove = null;
-        let myName = 'Kỳ Thủ';
-        let opponentName = 'Đối thủ';
-        let gameOver = false;
-
-        const INITIAL_BOARD = [
-            ['B_ROOK', 'B_HORSE', 'B_ELEPHANT', 'B_ADVISOR', 'B_GENERAL', 'B_ADVISOR', 'B_ELEPHANT', 'B_HORSE', 'B_ROOK'],
-            [null, null, null, null, null, null, null, null, null],
-            [null, 'B_CANNON', null, null, null, null, null, 'B_CANNON', null],
-            ['B_PAWN', null, 'B_PAWN', null, 'B_PAWN', null, 'B_PAWN', null, 'B_PAWN'],
-            [null, null, null, null, null, null, null, null, null],
-            [null, null, null, null, null, null, null, null, null],
-            ['R_PAWN', null, 'R_PAWN', null, 'R_PAWN', null, 'R_PAWN', null, 'R_PAWN'],
-            [null, 'R_CANNON', null, null, null, null, null, 'R_CANNON', null],
-            [null, null, null, null, null, null, null, null, null],
-            ['R_ROOK', 'R_HORSE', 'R_ELEPHANT', 'R_ADVISOR', 'R_GENERAL', 'R_ADVISOR', 'R_ELEPHANT', 'R_HORSE', 'R_ROOK']
-        ];
-
-        let boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
-
-        const pieceChars = {
-            'R_GENERAL': '帥', 'R_ADVISOR': '仕', 'R_ELEPHANT': '相', 'R_HORSE': '馬', 'R_ROOK': '車', 'R_CANNON': '炮', 'R_PAWN': '兵',
-            'B_GENERAL': '將', 'B_ADVISOR': '士', 'B_ELEPHANT': '象', 'B_HORSE': '馬', 'B_ROOK': '車', 'B_CANNON': '砲', 'B_PAWN': '卒'
-        };
-
-        // Khởi tạo PeerJS Cloud
-        function initPeer(customId = null) {
-            if (peer) peer.destroy();
-            const config = {
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                }
-            };
-            peer = customId ? new Peer(customId, config) : new Peer(config);
-
-            peer.on('open', () => {
-                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
-                document.getElementById('status-text').innerText = 'Online (Cloud)';
-            });
-
-            peer.on('error', (err) => {
-                console.error(err);
-                if (err.type === 'unavailable-id') {
-                    alert('Mã phòng bị trùng, vui lòng bấm Tạo Phòng lại!');
-                } else if (err.type === 'peer-unavailable') {
-                    alert('Không tìm thấy mã phòng này! Hãy kiểm tra lại 6 ký tự.');
-                } else {
-                    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
-                    document.getElementById('status-text').innerText = 'Mất kết nối mạng';
-                }
-            });
-
-            peer.on('connection', (connection) => {
-                conn = connection;
-                setupConnection();
-            });
-        }
-
-        initPeer();
-
-        function createRoom() {
-            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ Đỏ';
-            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            myColor = 'red';
-
-            initPeer('xiangqi_' + roomCode);
-            peer.on('open', () => {
-                document.getElementById('lobby-screen').classList.add('hidden');
-                document.getElementById('waiting-screen').classList.remove('hidden');
-                document.getElementById('display-room-code').innerText = roomCode;
-                document.getElementById('waiting-time-info').innerText = 
-                    `Chế độ: ${configTotalTime / 60} phút / ván • ${configTurnTime} giây / lượt`;
-            });
-        }
-
-        function joinRoom() {
-            myName = document.getElementById('player-name').value.trim() || 'Kỳ Thủ Đen';
-            const inputCode = document.getElementById('room-code-input').value.trim().toUpperCase();
-            if (inputCode.length !== 6) {
-                alert('Vui lòng nhập chính xác mã phòng gồm 6 ký tự!');
-                return;
-            }
-            roomCode = inputCode;
-            myColor = 'black';
-
-            conn = peer.connect('xiangqi_' + roomCode, { reliable: true });
-            setupConnection();
-        }
-
-        function setupConnection() {
-            conn.on('open', () => {
-                conn.send({ type: 'JOIN', name: myName });
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'JOIN') {
-                    opponentName = data.name;
-                    // Chủ phòng gửi cấu hình thời gian cho khách đồng bộ
-                    conn.send({ 
-                        type: 'WELCOME', 
-                        name: myName,
-                        totalTime: configTotalTime,
-                        turnTime: configTurnTime
-                    });
-                    startGame();
-                } else if (data.type === 'WELCOME') {
-                    opponentName = data.name;
-                    configTotalTime = data.totalTime || 300;
-                    configTurnTime = data.turnTime || 30;
-                    startGame();
-                } else if (data.type === 'MOVE') {
-                    boardState = data.boardState;
-                    currentTurn = data.currentTurn;
-                    lastMove = data.lastMove;
-                    // Đồng bộ thời gian tổng từ máy vừa đi và reset thời gian lượt mới
-                    if (typeof data.redTotalLeft === 'number') redTotalLeft = data.redTotalLeft;
-                    if (typeof data.blackTotalLeft === 'number') blackTotalLeft = data.blackTotalLeft;
-                    turnTimeLeft = configTurnTime;
-
-                    selectedPiece = null;
-                    validMoves = [];
-                    updateClockDisplay();
-                    renderBoard();
-                    evaluateTurnState();
-                } else if (data.type === 'TIMEOUT') {
-                    // Nhận thông báo hết giờ từ máy đang giữ lượt
-                    const loserColor = data.loser;
-                    if (loserColor === myColor) {
-                        showEndModal('⏰', 'Hết Giờ - Thua Cuộc!', data.reason || 'Bạn đã hết thời gian quy định.');
-                    } else {
-                        showEndModal('🏆', 'Chiến Thắng!', data.reason || 'Đối thủ đã hết thời gian quy định.');
-                    }
-                } else if (data.type === 'SURRENDER') {
-                    showEndModal('🏆', 'Chiến Thắng!', 'Đối thủ đã xin đầu hàng.');
-                } else if (data.type === 'DRAW_REQ') {
-                    if (confirm('Đối thủ muốn xin hòa ván cờ này. Bạn có đồng ý không?')) {
-                        conn.send({ type: 'DRAW_ACCEPT' });
-                        showEndModal('🤝', 'Hòa Cờ!', 'Hai kỳ thủ đã đồng ý hòa.');
-                    }
-                } else if (data.type === 'DRAW_ACCEPT') {
-                    showEndModal('🤝', 'Hòa Cờ!', 'Đối thủ đã chấp nhận lời đề nghị hòa.');
-                } else if (data.type === 'RESET') {
-                    resetBoardLocal();
-                }
-            });
-
-            conn.on('close', () => {
-                stopTimer();
-                if (!gameOver) {
-                    alert('Đối thủ đã ngắt kết nối khỏi phòng!');
-                }
-            });
-        }
-
-        function startGame() {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('waiting-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-
-            document.getElementById('my-name').innerText = `${myName} (${myColor === 'red' ? 'Đỏ' : 'Đen'})`;
-            document.getElementById('opponent-name').innerText = `${opponentName} (${myColor === 'red' ? 'Đen' : 'Đỏ'})`;
-
-            document.getElementById('my-badge').className = myColor === 'red'
-                ? 'w-3 h-3 rounded-full bg-red-600 border border-amber-300'
-                : 'w-3 h-3 rounded-full bg-stone-900 border border-amber-300';
-            document.getElementById('opp-badge').className = myColor === 'red'
-                ? 'w-3 h-3 rounded-full bg-stone-900 border border-amber-300'
-                : 'w-3 h-3 rounded-full bg-red-600 border border-amber-300';
-
-            resetBoardLocal();
-        }
-
-        function resetBoardLocal() {
-            boardState = JSON.parse(JSON.stringify(INITIAL_BOARD));
-            currentTurn = 'red';
-            selectedPiece = null;
-            validMoves = [];
-            lastMove = null;
-            gameOver = false;
-
-            // Đặt lại đồng hồ về ban đầu
-            redTotalLeft = configTotalTime;
-            blackTotalLeft = configTotalTime;
-            turnTimeLeft = configTurnTime;
-
-            document.getElementById('end-modal').classList.add('hidden');
-            document.getElementById('check-alert').classList.add('hidden');
-            updateClockDisplay();
-            renderBoard();
-            startTimer();
-        }
-
-        // --- HỆ THỐNG ĐỒNG HỒ ĐẾM NGƯỢC ---
-        function startTimer() {
-            stopTimer();
-            timerInterval = setInterval(() => {
-                if (gameOver) {
-                    stopTimer();
-                    return;
-                }
-
-                // Trừ 1 giây cho bên đang tới lượt
-                if (currentTurn === 'red') {
-                    redTotalLeft--;
-                } else {
-                    blackTotalLeft--;
-                }
-                turnTimeLeft--;
-
-                updateClockDisplay();
-
-                // Chỉ máy của người đang giữ lượt kiểm tra và phát tín hiệu xử thua khi hết giờ
-                if (currentTurn === myColor) {
-                    const myTotal = myColor === 'red' ? redTotalLeft : blackTotalLeft;
-                    if (myTotal <= 0) {
-                        const reason = 'Đã hết tổng thời gian của ván đấu.';
-                        if (conn && conn.open) conn.send({ type: 'TIMEOUT', loser: myColor, reason });
-                        showEndModal('⏰', 'Hết Giờ Tổng - Thua Cuộc!', reason);
-                    } else if (turnTimeLeft <= 0) {
-                        const reason = `Đã hết ${configTurnTime} giây cho một lượt đi.`;
-                        if (conn && conn.open) conn.send({ type: 'TIMEOUT', loser: myColor, reason });
-                        showEndModal('⏳', 'Hết Giờ Lượt Đi - Thua Cuộc!', reason);
-                    }
-                }
-            }, 1000);
-        }
-
-        function stopTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-        }
-
-        function updateClockDisplay() {
-            const myTotal = myColor === 'red' ? redTotalLeft : blackTotalLeft;
-            const oppTotal = myColor === 'red' ? blackTotalLeft : redTotalLeft;
-
-            const myTotalEl = document.getElementById('my-total-clock');
-            const myTurnEl = document.getElementById('my-turn-clock');
-            const oppTotalEl = document.getElementById('opp-total-clock');
-            const oppTurnEl = document.getElementById('opp-turn-clock');
-
-            myTotalEl.innerText = formatTimeMMSS(myTotal);
-            oppTotalEl.innerText = formatTimeMMSS(oppTotal);
-
-            if (currentTurn === myColor) {
-                // Đang là lượt của mình
-                myTurnEl.innerText = `${Math.max(0, turnTimeLeft)}s`;
-                oppTurnEl.innerText = `${configTurnTime}s`;
-
-                myTotalEl.className = myTotal <= 30
-                    ? 'px-2 py-0.5 rounded bg-red-900 border border-red-500 text-white font-bold text-xs animate-pulse'
-                    : 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500 text-emerald-300 font-bold text-xs';
-
-                myTurnEl.className = turnTimeLeft <= 10
-                    ? 'px-1.5 py-0.5 rounded bg-red-600 text-white font-bold text-[11px] animate-pulse'
-                    : 'px-1.5 py-0.5 rounded bg-emerald-700 text-white font-bold text-[11px]';
-
-                oppTotalEl.className = 'px-2 py-0.5 rounded bg-black/60 border border-amber-800/60 text-amber-200/70 font-bold text-xs';
-                oppTurnEl.className = 'px-1.5 py-0.5 rounded bg-black/40 border border-amber-800/40 text-amber-300/60 text-[11px]';
-            } else {
-                // Đang là lượt của đối thủ
-                oppTurnEl.innerText = `${Math.max(0, turnTimeLeft)}s`;
-                myTurnEl.innerText = `${configTurnTime}s`;
-
-                oppTotalEl.className = oppTotal <= 30
-                    ? 'px-2 py-0.5 rounded bg-red-900 border border-red-500 text-white font-bold text-xs animate-pulse'
-                    : 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500 text-emerald-300 font-bold text-xs';
-
-                oppTurnEl.className = turnTimeLeft <= 10
-                    ? 'px-1.5 py-0.5 rounded bg-red-600 text-white font-bold text-[11px] animate-pulse'
-                    : 'px-1.5 py-0.5 rounded bg-emerald-700 text-white font-bold text-[11px]';
-
-                myTotalEl.className = 'px-2 py-0.5 rounded bg-black/60 border border-amber-800/60 text-amber-200/70 font-bold text-xs';
-                myTurnEl.className = 'px-1.5 py-0.5 rounded bg-black/40 border border-amber-800/40 text-amber-300/60 text-[11px]';
-            }
-        }
-
-        function resetMatch() {
-            if (conn && conn.open) conn.send({ type: 'RESET' });
-            resetBoardLocal();
-        }
-
-        function copyRoomCode() {
-            navigator.clipboard.writeText(roomCode);
-            alert('Đã sao chép mã phòng: ' + roomCode);
-        }
-
-        function getCoordPercent(r, c) {
-            const isFlipped = (myColor === 'black');
-            const renderR = isFlipped ? 9 - r : r;
-            const renderC = isFlipped ? 8 - c : c;
-            return {
-                left: 7.7778 + renderC * 10.5556,
-                top: 7.0 + renderR * 9.5556
-            };
-        }
-
-        function renderBoard() {
-            const layer = document.getElementById('pieces-layer');
-            layer.innerHTML = '';
-
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    const pos = getCoordPercent(r, c);
-                    const piece = boardState[r][c];
-                    const isValidTarget = validMoves.some(m => m.r === r && m.c === c);
-
-                    if (piece) {
-                        const isRed = piece.startsWith('R');
-                        const isSelected = selectedPiece && selectedPiece.r === r && selectedPiece.c === c;
-                        const isLastMove = lastMove && ((lastMove.toR === r && lastMove.toC === c) || (lastMove.fromR === r && lastMove.fromC === c));
-
-                        const div = document.createElement('div');
-                        div.className = `xiangqi-piece piece-wood-base ${isRed ? 'piece-red' : 'piece-black'} ${isSelected ? 'piece-selected' : ''} ${isLastMove ? 'last-move-ring' : ''}`;
-                        div.style.left = `${pos.left}%`;
-                        div.style.top = `${pos.top}%`;
-                        div.style.fontSize = 'clamp(16px, 4.6vw, 22px)';
-                        div.style.zIndex = isSelected ? '30' : '15';
-                        div.innerText = pieceChars[piece];
-
-                        div.onclick = (e) => {
-                            e.stopPropagation();
-                            handleCellClick(r, c);
-                        };
-                        layer.appendChild(div);
-
-                        if (isValidTarget) {
-                            const ring = document.createElement('div');
-                            ring.className = 'valid-capture-ring';
-                            ring.style.left = `${pos.left}%`;
-                            ring.style.top = `${pos.top}%`;
-                            layer.appendChild(ring);
-                        }
-                    } else {
-                        const hitArea = document.createElement('div');
-                        hitArea.className = 'absolute w-[9.5%] aspect-square -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10';
-                        hitArea.style.left = `${pos.left}%`;
-                        hitArea.style.top = `${pos.top}%`;
-                        hitArea.onclick = (e) => {
-                            e.stopPropagation();
-                            handleCellClick(r, c);
-                        };
-                        layer.appendChild(hitArea);
-
-                        if (isValidTarget) {
-                            const dot = document.createElement('div');
-                            dot.className = 'valid-dot';
-                            dot.style.left = `${pos.left}%`;
-                            dot.style.top = `${pos.top}%`;
-                            layer.appendChild(dot);
-                        }
-                    }
-                }
-            }
-
-            const turnEl = document.getElementById('turn-indicator');
-            if (currentTurn === myColor) {
-                turnEl.innerText = 'Lượt bạn';
-                turnEl.className = 'px-2 py-0.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow';
-            } else {
-                turnEl.innerText = 'Lượt bạn kia';
-                turnEl.className = 'px-2 py-0.5 rounded-lg bg-amber-900/90 text-amber-300 font-semibold text-[11px]';
-            }
-        }
-
-        function handleCellClick(r, c) {
-            if (gameOver || currentTurn !== myColor) return;
-
-            const clickedPiece = boardState[r][c];
-            const myPrefix = myColor === 'red' ? 'R_' : 'B_';
-
-            if (clickedPiece && clickedPiece.startsWith(myPrefix)) {
-                selectedPiece = { r, c, piece: clickedPiece };
-                validMoves = getLegalMoves(boardState, r, c);
-                renderBoard();
-                return;
-            }
-
-            if (selectedPiece) {
-                const isLegal = validMoves.some(m => m.r === r && m.c === c);
-                if (!isLegal) return;
-
-                const fromR = selectedPiece.r;
-                const fromC = selectedPiece.c;
-
-                boardState[r][c] = selectedPiece.piece;
-                boardState[fromR][fromC] = null;
-
-                lastMove = { fromR, fromC, toR: r, toC: c };
-                selectedPiece = null;
-                validMoves = [];
-                currentTurn = currentTurn === 'red' ? 'black' : 'red';
-                turnTimeLeft = configTurnTime; // Reset thời gian lượt đi cho người tiếp theo
-
-                updateClockDisplay();
-                renderBoard();
-                evaluateTurnState();
-
-                if (conn && conn.open) {
-                    conn.send({
-                        type: 'MOVE',
-                        boardState: boardState,
-                        currentTurn: currentTurn,
-                        lastMove: lastMove,
-                        redTotalLeft: redTotalLeft,
-                        blackTotalLeft: blackTotalLeft
-                    });
-                }
-            }
-        }
-
-        // --- LUẬT CỜ TƯỚNG CHUẨN ---
-        function getPseudoMoves(board, r, c) {
-            const piece = board[r][c];
-            if (!piece) return [];
-            const isRed = piece.startsWith('R_');
-            const type = piece.split('_')[1];
-            const moves = [];
-
-            const isEnemyOrEmpty = (tr, tc) => {
-                if (tr < 0 || tr > 9 || tc < 0 || tc > 8) return false;
-                const target = board[tr][tc];
-                if (!target) return true;
-                return isRed ? target.startsWith('B_') : target.startsWith('R_');
-            };
-
-            if (type === 'ROOK') {
-                const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-                dirs.forEach(([dr, dc]) => {
-                    let nr = r + dr, nc = c + dc;
-                    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
-                        if (!board[nr][nc]) {
-                            moves.push({r: nr, c: nc});
-                        } else {
-                            if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                            break;
-                        }
-                        nr += dr; nc += dc;
-                    }
-                });
-            } else if (type === 'CANNON') {
-                const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-                dirs.forEach(([dr, dc]) => {
-                    let nr = r + dr, nc = c + dc;
-                    let jumped = false;
-                    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
-                        if (!jumped) {
-                            if (!board[nr][nc]) {
-                                moves.push({r: nr, c: nc});
-                            } else {
-                                jumped = true;
-                            }
-                        } else {
-                            if (board[nr][nc]) {
-                                if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                                break;
-                            }
-                        }
-                        nr += dr; nc += dc;
-                    }
-                });
-            } else if (type === 'HORSE') {
-                const jumps = [
-                    {dr: -2, dc: -1, lr: -1, lc: 0}, {dr: -2, dc: 1, lr: -1, lc: 0},
-                    {dr: 2, dc: -1, lr: 1, lc: 0},   {dr: 2, dc: 1, lr: 1, lc: 0},
-                    {dr: -1, dc: -2, lr: 0, lc: -1}, {dr: 1, dc: -2, lr: 0, lc: -1},
-                    {dr: -1, dc: 2, lr: 0, lc: 1},   {dr: 1, dc: 2, lr: 0, lc: 1}
-                ];
-                jumps.forEach(j => {
-                    const legR = r + j.lr, legC = c + j.lc;
-                    const nr = r + j.dr, nc = c + j.dc;
-                    if (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8 && !board[legR][legC]) {
-                        if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                    }
-                });
-            } else if (type === 'ELEPHANT') {
-                const steps = [
-                    {dr: -2, dc: -2, er: -1, ec: -1}, {dr: -2, dc: 2, er: -1, ec: 1},
-                    {dr: 2, dc: -2, er: 1, ec: -1},   {dr: 2, dc: 2, er: 1, ec: 1}
-                ];
-                steps.forEach(s => {
-                    const nr = r + s.dr, nc = c + s.dc;
-                    const eyeR = r + s.er, eyeC = c + s.ec;
-                    const inOwnSide = isRed ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4);
-                    if (inOwnSide && nc >= 0 && nc <= 8 && !board[eyeR][eyeC]) {
-                        if (isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                    }
-                });
-            } else if (type === 'ADVISOR') {
-                const steps = [[-1,-1],[-1,1],[1,-1],[1,1]];
-                steps.forEach(([dr, dc]) => {
-                    const nr = r + dr, nc = c + dc;
-                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
-                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                });
-            } else if (type === 'GENERAL') {
-                const steps = [[-1,0],[1,0],[0,-1],[0,1]];
-                steps.forEach(([dr, dc]) => {
-                    const nr = r + dr, nc = c + dc;
-                    const inPalace = isRed ? (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5) : (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5);
-                    if (inPalace && isEnemyOrEmpty(nr, nc)) moves.push({r: nr, c: nc});
-                });
-            } else if (type === 'PAWN') {
-                const forward = isRed ? -1 : 1;
-                if (isEnemyOrEmpty(r + forward, c)) moves.push({r: r + forward, c});
-                const crossedRiver = isRed ? (r <= 4) : (r >= 5);
-                if (crossedRiver) {
-                    if (isEnemyOrEmpty(r, c - 1)) moves.push({r, c: c - 1});
-                    if (isEnemyOrEmpty(r, c + 1)) moves.push({r, c: c + 1});
-                }
-            }
-            return moves;
-        }
-
-        function isKingInCheck(board, color) {
-            const kingName = color === 'red' ? 'R_GENERAL' : 'B_GENERAL';
-            const oppKingName = color === 'red' ? 'B_GENERAL' : 'R_GENERAL';
-            let kr = -1, kc = -1, okr = -1, okc = -1;
-
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (board[r][c] === kingName) { kr = r; kc = c; }
-                    if (board[r][c] === oppKingName) { okr = r; okc = c; }
-                }
-            }
-            if (kr === -1) return true;
-
-            if (kc === okc && okr !== -1) {
-                let blocked = false;
-                const minR = Math.min(kr, okr), maxR = Math.max(kr, okr);
-                for (let i = minR + 1; i < maxR; i++) {
-                    if (board[i][kc]) { blocked = true; break; }
-                }
-                if (!blocked) return true;
-            }
-
-            const oppPrefix = color === 'red' ? 'B_' : 'R_';
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (board[r][c] && board[r][c].startsWith(oppPrefix)) {
-                        const oppMoves = getPseudoMoves(board, r, c);
-                        if (oppMoves.some(m => m.r === kr && m.c === kc)) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function getLegalMoves(board, r, c) {
-            const piece = board[r][c];
-            if (!piece) return [];
-            const color = piece.startsWith('R_') ? 'red' : 'black';
-            const pseudo = getPseudoMoves(board, r, c);
-
-            return pseudo.filter(m => {
-                const copy = board.map(row => [...row]);
-                copy[m.r][m.c] = copy[r][c];
-                copy[r][c] = null;
-                return !isKingInCheck(copy, color);
-            });
-        }
-
-        function evaluateTurnState() {
-            const inCheck = isKingInCheck(boardState, currentTurn);
-            const alertEl = document.getElementById('check-alert');
-            if (inCheck) {
-                alertEl.classList.remove('hidden');
-            } else {
-                alertEl.classList.add('hidden');
-            }
-
-            const prefix = currentTurn === 'red' ? 'R_' : 'B_';
-            let hasAnyMove = false;
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 9; c++) {
-                    if (boardState[r][c] && boardState[r][c].startsWith(prefix)) {
-                        if (getLegalMoves(boardState, r, c).length > 0) {
-                            hasAnyMove = true;
-                            break;
-                        }
-                    }
-                }
-                if (hasAnyMove) break;
-            }
-
-            if (!hasAnyMove) {
-                const winner = currentTurn === 'red' ? 'black' : 'red';
-                if (winner === myColor) {
-                    showEndModal('🏆', 'Chiếu Bí - Bạn Thắng!', 'Đối thủ đã hết nước đi hợp lệ.');
-                } else {
-                    showEndModal('🏳️', 'Thua Cuộc!', 'Bạn đã bị chiếu bí hoặc hết nước đi.');
-                }
-            }
-        }
-
-        function showEndModal(icon, title, desc) {
-            gameOver = true;
-            stopTimer();
-            document.getElementById('end-icon').innerText = icon;
-            document.getElementById('end-title').innerText = title;
-            document.getElementById('end-desc').innerText = desc;
-            document.getElementById('end-modal').classList.remove('hidden');
-        }
-
-        function surrender() {
-            if (confirm('Bạn có chắc chắn muốn đầu hàng ván này?')) {
-                if (conn && conn.open) conn.send({ type: 'SURRENDER' });
-                showEndModal('🏳️', 'Đã Đầu Hàng', 'Bạn đã xin nhận thua ván này.');
-            }
-        }
-
-        function requestDraw() {
-            if (conn && conn.open) {
-                conn.send({ type: 'DRAW_REQ' });
-                alert('Đã gửi lời đề nghị hòa tới đối thủ.');
-            }
-        }
-    </script>
-</body>
-</html>
+                <button onclick="resetMatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-
